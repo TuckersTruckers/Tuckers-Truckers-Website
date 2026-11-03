@@ -219,6 +219,7 @@ function ownerNavSetup(){
  const appLayout=document.querySelector('.app-layout');
  const primary=$('tabs');
  const secondary=$('secondary-nav');
+ const secondarySidebar=$('secondary-sidebar');
  const secondaryTitle=$('secondary-nav-title');
  const secondaryCopy=$('secondary-nav-copy');
  const frame=$('owner-content-frame');
@@ -239,7 +240,7 @@ function ownerNavSetup(){
   for(const group of config.groups){const heading=document.createElement('div');heading.className='secondary-group-heading';heading.textContent=group.heading;secondary.append(heading);
    for(const item of group.items){const [label,kind,target]=item;const button=document.createElement('button');button.type='button';button.className='secondary-nav-link'+(label===activeLabel?' active':'');button.textContent=label;button.addEventListener('click',()=>{document.querySelectorAll('.secondary-nav-link').forEach(x=>x.classList.toggle('active',x===button));if(kind==='page')openPage(target,label);else showPanel(target)});secondary.append(button)}
   }
-  secondary.hidden=false;
+  secondarySidebar.hidden=false;
  }
  function selectSection(section){
   document.querySelectorAll('.primary-nav-link').forEach(x=>x.classList.toggle('active',x.dataset.section===section));
