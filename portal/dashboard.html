@@ -248,6 +248,72 @@
  .app-layout.owner-navigation #owner-content-frame{height:calc(100vh - 260px);min-height:520px}
 }
 
+
+/* Owner navigation refinement: aligned top edge, true two-state primary rail. */
+@media(min-width:761px){
+ body{--owner-primary-expanded:220px;--owner-primary-collapsed:56px}
+ .header{margin:0 0 0 var(--owner-primary-expanded)!important;width:calc(100% - var(--owner-primary-expanded));min-height:76px;padding:14px 30px}
+ .app-layout.owner-navigation{display:block!important;width:auto!important;max-width:none!important;margin:0 0 0 var(--owner-primary-expanded)!important;padding:0 22px 0 0!important;min-height:calc(100vh - 76px)}
+ .app-layout.owner-navigation .sidebar,
+ .app-layout.owner-navigation .sidebar:hover,
+ .app-layout.owner-navigation .sidebar:focus-within{
+  position:fixed!important;left:0!important;top:0!important;bottom:0!important;z-index:60!important;
+  width:var(--owner-primary-expanded)!important;height:100vh!important;min-height:100vh!important;
+  padding:16px 12px!important;overflow-x:hidden!important;overflow-y:auto!important;
+  background:#171717!important;transition:width .18s ease!important;
+ }
+ .app-layout.owner-navigation .sidebar-brand{justify-content:flex-start!important;padding:0 4px 12px!important;margin:0 0 12px!important}
+ .app-layout.owner-navigation .sidebar-brand span{display:block!important}
+ .app-layout.owner-navigation .sidebar-label{display:block!important}
+ .app-layout.owner-navigation .tabs{display:grid!important;gap:5px!important;margin-top:8px!important}
+ .app-layout.owner-navigation .primary-nav-link{justify-content:flex-start!important;gap:11px!important;padding:8px 10px!important}
+ .app-layout.owner-navigation .primary-nav-link>span:last-child{display:inline!important}
+ .app-layout.owner-navigation .primary-nav-link::before{content:none!important;display:none!important}
+ .app-layout.owner-navigation .secondary-sidebar{display:none!important}
+ .app-layout.owner-navigation.owner-secondary-open{margin-left:276px!important}
+ body.owner-secondary-open .header{margin-left:276px!important;width:calc(100% - 276px)!important}
+ body.owner-secondary-open .footer{margin-left:276px!important}
+ .app-layout.owner-navigation.owner-secondary-open .sidebar,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:hover,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:focus-within{
+  width:56px!important;padding:16px 7px!important;overflow:hidden!important;
+ }
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:hover,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:focus-within{
+  width:220px!important;overflow-x:hidden!important;overflow-y:auto!important;
+ }
+ .app-layout.owner-navigation.owner-secondary-open .sidebar-brand{justify-content:center!important}
+ .app-layout.owner-navigation.owner-secondary-open .sidebar-brand span,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar-label,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar-note{display:none!important}
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:hover .sidebar-brand span,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:focus-within .sidebar-brand span{display:block!important}
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:hover .sidebar-label,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:focus-within .sidebar-label{display:block!important}
+ .app-layout.owner-navigation.owner-secondary-open .tabs{display:grid!important}
+ .app-layout.owner-navigation.owner-secondary-open .primary-nav-link{justify-content:center!important;padding:8px 4px!important}
+ .app-layout.owner-navigation.owner-secondary-open .primary-nav-link>span:last-child{display:none!important}
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:hover .primary-nav-link,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:focus-within .primary-nav-link{justify-content:flex-start!important;padding:8px 10px!important}
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:hover .primary-nav-link>span:last-child,
+ .app-layout.owner-navigation.owner-secondary-open .sidebar:focus-within .primary-nav-link>span:last-child{display:inline!important}
+ .app-layout.owner-navigation.owner-secondary-open .secondary-sidebar,
+ .app-layout.owner-navigation.owner-secondary-open .secondary-sidebar[hidden]{
+  display:block!important;position:fixed!important;left:56px!important;top:0!important;bottom:0!important;z-index:35!important;
+  width:220px!important;height:100vh!important;min-height:100vh!important;overflow-y:auto!important;
+  padding:20px 13px!important;background:#202020!important;
+ }
+ .app-layout.owner-navigation.owner-secondary-open .shell{margin:0!important;padding:22px 0 36px 22px!important;width:100%!important;max-width:none!important}
+ .app-layout.owner-navigation.owner-secondary-open #owner-content-frame{height:calc(100vh - 120px)!important}
+ .footer{margin-left:var(--owner-primary-expanded)!important}
+}
+@media(max-width:760px){
+ .app-layout.owner-navigation .secondary-sidebar[hidden]{display:none!important}
+ .app-layout.owner-navigation.owner-secondary-open .secondary-sidebar{display:block!important}
+ .app-layout.owner-navigation.owner-secondary-open .sidebar{width:100%!important}
+ .app-layout.owner-navigation.owner-secondary-open .primary-nav-link::before{content:none!important;display:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -371,6 +437,15 @@ function ownerNavSetup(){
  }
  function selectSection(section){
   document.querySelectorAll('.primary-nav-link').forEach(x=>x.classList.toggle('active',x.dataset.section===section));
+  if(section==='Dashboard'){
+   appLayout.classList.remove('owner-secondary-open');
+   document.body.classList.remove('owner-secondary-open');
+   secondarySidebar.hidden=true;
+   showPanel('overview');
+   return;
+  }
+  appLayout.classList.add('owner-secondary-open');
+  document.body.classList.add('owner-secondary-open');
   const first=sections[section].groups.flatMap(g=>g.items)[0];
   renderSecondary(section,first[0]);
   if(first[1]==='page')openPage(first[2],first[0]);else showPanel(first[2]);
