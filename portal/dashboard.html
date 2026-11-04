@@ -268,6 +268,9 @@
  .app-layout.owner-navigation .tabs{display:grid!important;gap:5px!important;margin-top:8px!important}
  .app-layout.owner-navigation .primary-nav-link{justify-content:flex-start!important;gap:11px!important;padding:8px 10px!important}
  .app-layout.owner-navigation .primary-nav-link>span:last-child{display:inline!important}
+ /* Dashboard has no secondary rail, so hover must retain the expanded labels. */
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .primary-nav-link>span:last-child,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .primary-nav-link>span:last-child{display:inline!important}
  .app-layout.owner-navigation .primary-nav-link::before{content:none!important;display:none!important}
  .app-layout.owner-navigation .secondary-sidebar{display:none!important}
  .app-layout.owner-navigation.owner-secondary-open{margin-left:276px!important}
@@ -312,6 +315,19 @@
  .app-layout.owner-navigation.owner-secondary-open .secondary-sidebar{display:block!important}
  .app-layout.owner-navigation.owner-secondary-open .sidebar{width:100%!important}
  .app-layout.owner-navigation.owner-secondary-open .primary-nav-link::before{content:none!important;display:none!important}
+}
+
+
+/* Keep the primary rail collapsed immediately after choosing a section.
+   Leaving the rail clears the temporary lock, so subsequent hover expands it normally. */
+@media(min-width:761px){
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar,
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar:hover,
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar:focus-within{
+  width:56px!important;padding:16px 7px!important;overflow:hidden!important;
+ }
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .primary-nav-link{justify-content:center!important;padding:8px 4px!important}
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .primary-nav-link>span:last-child{display:none!important}
 }
 
 </style>
@@ -435,16 +451,19 @@ function ownerNavSetup(){
   }
   secondarySidebar.hidden=false;
  }
+ const primarySidebar=appLayout.querySelector('.sidebar');
+ primarySidebar.addEventListener('mouseleave',()=>appLayout.classList.remove('owner-primary-just-selected'));
  function selectSection(section){
   document.querySelectorAll('.primary-nav-link').forEach(x=>x.classList.toggle('active',x.dataset.section===section));
   if(section==='Dashboard'){
+   appLayout.classList.remove('owner-primary-just-selected');
    appLayout.classList.remove('owner-secondary-open');
    document.body.classList.remove('owner-secondary-open');
    secondarySidebar.hidden=true;
    showPanel('overview');
    return;
   }
-  appLayout.classList.add('owner-secondary-open');
+  appLayout.classList.add('owner-secondary-open','owner-primary-just-selected');
   document.body.classList.add('owner-secondary-open');
   const first=sections[section].groups.flatMap(g=>g.items)[0];
   renderSecondary(section,first[0]);
