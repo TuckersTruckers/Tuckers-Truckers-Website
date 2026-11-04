@@ -269,7 +269,7 @@
  .app-layout.owner-navigation .primary-nav-link{justify-content:flex-start!important;gap:11px!important;padding:8px 10px!important}
  .app-layout.owner-navigation .primary-nav-link>span:last-child{display:inline!important}
  /* Dashboard has no secondary rail, so hover must retain the expanded labels. */
- .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .primary-nav-link>span:last-child,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar-brand span,\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand span,\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand span{display:block!important;visibility:visible!important;opacity:1!important}\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .primary-nav-link>span:last-child,
  .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .primary-nav-link>span:last-child{display:inline!important}
  .app-layout.owner-navigation .primary-nav-link::before{content:none!important;display:none!important}
  .app-layout.owner-navigation .secondary-sidebar{display:none!important}
@@ -452,7 +452,7 @@ function ownerNavSetup(){
   secondarySidebar.hidden=false;
  }
  const primarySidebar=appLayout.querySelector('.sidebar');
- primarySidebar.addEventListener('mouseleave',()=>appLayout.classList.remove('owner-primary-just-selected'));
+ primarySidebar.addEventListener('pointerenter',()=>appLayout.classList.remove('owner-primary-just-selected'));
  function selectSection(section){
   document.querySelectorAll('.primary-nav-link').forEach(x=>x.classList.toggle('active',x.dataset.section===section));
   if(section==='Dashboard'){
