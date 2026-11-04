@@ -256,13 +256,14 @@ function ownerNavSetup(){
  const sections={
   Dashboard:{copy:'Your operations at a glance.',groups:[{heading:'OVERVIEW',items:[['Overview','panel','overview']]}]},
   'Load Board':{copy:'Load search and dispatch workflows.',groups:[{heading:'LOAD MANAGEMENT',items:[['Load Board','panel','loads'],['Quotes','panel','quotes']]}]},
-  Carriers:{copy:'Manage carrier accounts and onboarding.',groups:[{heading:'OVERVIEW',items:[['Home','page','carriers.html']]},{heading:'CARRIER MANAGEMENT',items:[['New Carrier Setup','page','admin.html'],['Pending Approvals','page','pending-accounts.html'],['Inquiries','page','inquiries.html']]}]},
+  Carriers:{copy:'Manage carrier records, onboarding, and approvals.',groups:[{heading:'OVERVIEW',items:[['Carrier Directory','page','carriers.html']]},{heading:'CARRIER MANAGEMENT',items:[['Add New Carrier','page','admin.html#carrier-panel'],['Pending Approvals','page','pending-accounts.html'],['Carrier Inquiries','page','inquiries.html']]}]},
   Finance:{copy:'Financial tools and carrier settlement workflows.',groups:[{heading:'FINANCIAL WORKSPACE',items:[['Overview','panel','factoring'],['Factoring','panel','factoring'],['Expenses','panel','expenses']]}]},
-  Administration:{copy:'Manage portal accounts and access.',groups:[{heading:'ACCOUNT MANAGEMENT',items:[['Account Setup','page','admin.html'],['Dispatcher Access','page','admin.html#dispatcher-assignment-section']]}]}
+  Administration:{copy:'Control account provisioning, assignments, and platform access.',groups:[{heading:'PLATFORM ADMINISTRATION',items:[['Account Provisioning','page','admin.html#carrier-panel'],['Driver & Carrier Assignments','page','admin.html#driver-panel'],['Dispatcher Access','page','admin.html#dispatcher-assignment-section']]}]}
  };
  const primaryItems=[['Dashboard','layout-dashboard'],['Load Board','clipboard-list'],['Carriers','truck'],['Finance','wallet'],['Administration','settings']];
  function showPanel(id){appLayout.classList.remove('owner-page-open');frame.removeAttribute('src');activateTab(id)}
  function openPage(url,label){appLayout.classList.add('owner-page-open');frame.src=url;frame.title=label+' · Tucker\'s Truckers portal';}
+ appLayout.querySelector('.shell').addEventListener('click',event=>{const link=event.target.closest('a[href]');if(!link||link.target==='_blank'||event.defaultPrevented)return;const href=link.getAttribute('href');if(!href||href.startsWith('#')||/^(?:[a-z]+:|\/\/)/i.test(href))return;const url=new URL(href,location.href);if(url.origin!==location.origin||!url.pathname.includes('/portal/'))return;event.preventDefault();openPage(url.pathname.split('/portal/')[1]+url.hash,link.textContent.trim()||'Portal section');});
  function renderSecondary(section,activeLabel){
   const config=sections[section];secondaryTitle.textContent=section;secondaryCopy.textContent=config.copy;secondary.replaceChildren();
   for(const group of config.groups){const heading=document.createElement('div');heading.className='secondary-group-heading';heading.textContent=group.heading;secondary.append(heading);
