@@ -269,7 +269,9 @@
  .app-layout.owner-navigation .primary-nav-link{justify-content:flex-start!important;gap:11px!important;padding:8px 10px!important}
  .app-layout.owner-navigation .primary-nav-link>span:last-child{display:inline!important}
  /* Dashboard has no secondary rail, so hover must retain the expanded labels. */
- .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar-brand span,\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand span,\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand span{display:block!important;visibility:visible!important;opacity:1!important}\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .primary-nav-link>span:last-child,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand>span,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand>span{display:inline!important;visibility:visible!important;opacity:1!important}
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .primary-nav-link>span:last-child,
  .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .primary-nav-link>span:last-child{display:inline!important}
  .app-layout.owner-navigation .primary-nav-link::before{content:none!important;display:none!important}
  .app-layout.owner-navigation .secondary-sidebar{display:none!important}
@@ -330,6 +332,35 @@
  .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .primary-nav-link>span:last-child{display:none!important}
 }
 
+
+/* Final owner-navigation interaction fixes:
+   keep the Dashboard brand title visible, and collapse immediately after selection
+   even while the pointer remains over the primary rail. */
+@media(min-width:761px){
+ /* Apply the same hover-label override that fixed the primary navigation text. */
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand>span,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand>span{
+  display:inline!important;visibility:visible!important;opacity:1!important;
+ }
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand>span>small,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand>span>small{
+  display:block!important;visibility:visible!important;opacity:1!important;
+ }
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar,
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar:hover,
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar:focus-within{
+  width:56px!important;padding:16px 7px!important;overflow:hidden!important;
+ }
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar-brand span,
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar-label,
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar-note,
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .primary-nav-link>span:last-child{
+  display:none!important;
+ }
+ .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .primary-nav-link{
+  justify-content:center!important;padding:8px 4px!important;
+ }
+}
 </style>
 </head>
 <body>
@@ -452,7 +483,7 @@ function ownerNavSetup(){
   secondarySidebar.hidden=false;
  }
  const primarySidebar=appLayout.querySelector('.sidebar');
- primarySidebar.addEventListener('pointerenter',()=>appLayout.classList.remove('owner-primary-just-selected'));
+ primarySidebar.addEventListener('pointerleave',()=>appLayout.classList.remove('owner-primary-just-selected'));
  function selectSection(section){
   document.querySelectorAll('.primary-nav-link').forEach(x=>x.classList.toggle('active',x.dataset.section===section));
   if(section==='Dashboard'){
@@ -470,7 +501,7 @@ function ownerNavSetup(){
   if(first[1]==='page')openPage(first[2],first[0]);else showPanel(first[2]);
  }
  primary.replaceChildren();
- for(const [label,icon] of primaryItems){const button=document.createElement('button');button.type='button';button.className='primary-nav-link';button.dataset.section=label;button.innerHTML='<span class="primary-nav-icon" aria-hidden="true"></span><span></span>';button.querySelector('.primary-nav-icon').textContent=({'Dashboard':'⌂','Load Board':'▤','Carriers':'▰','Finance':'＄','Administration':'⚙'})[label];button.querySelector('span:last-child').textContent=label;button.addEventListener('click',()=>selectSection(label));primary.append(button)}
+ for(const [label,icon] of primaryItems){const button=document.createElement('button');button.type='button';button.className='primary-nav-link';button.dataset.section=label;button.innerHTML='<span class="primary-nav-icon" aria-hidden="true"></span><span></span>';button.querySelector('.primary-nav-icon').textContent=({'Dashboard':'⌂','Load Board':'▤','Carriers':'▰','Finance':'＄','Administration':'⚙'})[label];button.querySelector('span:last-child').textContent=label;button.addEventListener('click',()=>{button.blur();selectSection(label)});primary.append(button)}
  primary.hidden=false;selectSection('Dashboard');
 }function tabSetup(items){const tabs=$('tabs');tabs.replaceChildren();const groups=[['Home',['overview','access']],['Operations',['carriers','drivers','loads','quotes','onboarding']],['Performance & finance',['performance','factoring','expenses']],['Company & network',['brokers','lookup','equipment','company']],['Administration',['admin']]];for(const [groupName,ids] of groups){const entries=items.filter(([id])=>ids.includes(id));if(!entries.length)continue;const details=document.createElement('details');details.className='nav-group';details.open=groupName==='Home';const summary=document.createElement('summary');summary.textContent=groupName;details.append(summary);const subnav=document.createElement('div');subnav.className='tab-subnav';for(const [id,label] of entries){const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.panel=id;b.addEventListener('click',()=>activateTab(id));subnav.append(b)}details.append(subnav);tabs.append(details)}tabs.hidden=false;activateTab('overview')}
 function activateTab(id){const ids=['overview','carriers','drivers','loads','quotes','onboarding','admin','access',...moduleSpecs.map(x=>x[0])];for(const key of ids){const panel=$(key+'-panel');if(panel)panel.hidden=key!==id}const buttons=[...document.querySelectorAll('#tabs button')];buttons.forEach(b=>b.classList.toggle('active',b.dataset.panel===id));const active=buttons.find(b=>b.dataset.panel===id);if(active){const group=active.closest('details');document.querySelectorAll('#tabs details').forEach(d=>d.open=d===group)}}
