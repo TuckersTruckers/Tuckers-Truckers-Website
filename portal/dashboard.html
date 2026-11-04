@@ -269,7 +269,9 @@
  .app-layout.owner-navigation .primary-nav-link{justify-content:flex-start!important;gap:11px!important;padding:8px 10px!important}
  .app-layout.owner-navigation .primary-nav-link>span:last-child{display:inline!important}
  /* Dashboard has no secondary rail, so hover must retain the expanded labels. */
- .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar-brand span,\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand span,\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand span{display:block!important;visibility:visible!important;opacity:1!important}\n .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .primary-nav-link>span:last-child,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand>span,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand>span{display:inline!important;visibility:visible!important;opacity:1!important}
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .primary-nav-link>span:last-child,
  .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .primary-nav-link>span:last-child{display:inline!important}
  .app-layout.owner-navigation .primary-nav-link::before{content:none!important;display:none!important}
  .app-layout.owner-navigation .secondary-sidebar{display:none!important}
@@ -335,12 +337,15 @@
    keep the Dashboard brand title visible, and collapse immediately after selection
    even while the pointer remains over the primary rail. */
 @media(min-width:761px){
- .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar-brand span,
- .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand span,
- .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand span{
+ /* Apply the same hover-label override that fixed the primary navigation text. */
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand>span,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand>span{
+  display:inline!important;visibility:visible!important;opacity:1!important;
+ }
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:hover .sidebar-brand>span>small,
+ .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar:focus-within .sidebar-brand>span>small{
   display:block!important;visibility:visible!important;opacity:1!important;
  }
- .app-layout.owner-navigation:not(.owner-secondary-open) .sidebar-brand small{display:block!important}
  .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar,
  .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar:hover,
  .app-layout.owner-navigation.owner-secondary-open.owner-primary-just-selected .sidebar:focus-within{
