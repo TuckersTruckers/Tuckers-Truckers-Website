@@ -124,3 +124,22 @@ on storage.objects for select to authenticated using(
     and private.can_access_dispatch_load(i.approved_load_id)
  )
 );
+
+create index if not exists rate_confirmation_intakes_approved_load_idx on public.rate_confirmation_intakes(approved_load_id);
+create index if not exists rate_confirmation_intakes_reviewed_by_idx on public.rate_confirmation_intakes(reviewed_by);
+create index if not exists rate_confirmation_intakes_uploaded_by_idx on public.rate_confirmation_intakes(uploaded_by);
+create or replace function private.can_read_approved_rate_confirmation(target_path text)
+returns boolean language sql stable security definer set search_path=''
+as $$
+ select (select auth.uid()) is not null and exists(
+  select 1 from public.rate_confirmation_intakes i
+  where i.original_file_path=target_path and i.approved_load_id is not null
+    and private.can_access_dispatch_load(i.approved_load_id)
+ );
+$$;
+revoke all on function private.can_read_approved_rate_confirmation(text) from public,anon;
+grant execute on function private.can_read_approved_rate_confirmation(text) to authenticated;
+drop policy if exists "Load participants read approved rate confirmation originals" on storage.objects;
+create policy "Load participants read approved rate confirmation originals"
+on storage.objects for select to authenticated
+using(bucket_id='rate-confirmations' and private.can_read_approved_rate_confirmation(name));
