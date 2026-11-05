@@ -71,3 +71,9 @@ end;
 $$;
 revoke all on function public.approve_rate_confirmation_intake(uuid,jsonb) from public,anon;
 grant execute on function public.approve_rate_confirmation_intake(uuid,jsonb) to authenticated;
+
+-- Permit cleanup only for unprocessed uploads or failed extractions.
+grant delete on public.rate_confirmation_intakes to authenticated;
+create policy "Dispatchers delete failed rate confirmation intakes"
+on public.rate_confirmation_intakes for delete to authenticated
+using(private.can_manage_carrier_loads(carrier_user_id) and status in ('uploaded','failed'));
