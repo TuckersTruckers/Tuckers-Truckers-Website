@@ -107,12 +107,14 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     driverSelect.replaceChildren(new Option('Select driver',''));
     truckSelect.replaceChildren(new Option('Select truck profile',''));
     if(!id)return;
-    const [drivers,trucks]=await Promise.all([
+    const [drivers,driverAccounts,trucks]=await Promise.all([
       supabase.from('carrier_drivers').select('id,display_name,driver_status').eq('carrier_user_id',id).eq('driver_status','active').order('display_name'),
+      supabase.from('driver_profiles').select('user_id,full_name').eq('carrier_user_id',id).order('full_name'),
       supabase.from('carrier_truck_profiles').select('id,profile_name,profile_status').eq('carrier_user_id',id).eq('profile_status','active').order('profile_name')
     ]);
-    if(drivers.error)throw drivers.error;if(trucks.error)throw trucks.error;
-    (drivers.data||[]).forEach(d=>driverSelect.append(new Option(d.display_name,d.id)));
+    if(drivers.error)throw drivers.error;if(driverAccounts.error)throw driverAccounts.error;if(trucks.error)throw trucks.error;
+    (driverAccounts.data||[]).forEach(d=>driverSelect.append(new Option((d.full_name||'Driver')+' · Portal login','profile:'+d.user_id)));
+    (drivers.data||[]).forEach(d=>driverSelect.append(new Option((d.display_name||'Driver')+' · Employee profile','record:'+d.id)));
     (trucks.data||[]).forEach(t=>truckSelect.append(new Option(t.profile_name,t.id)));
   }
   if(canManage && carrierSelect.value) await loadCarrierResources(carrierSelect.value).catch(e=>say(e.message,true));
@@ -127,7 +129,11 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     save.disabled=true;save.textContent='Saving…';
     let loadId=null;
     try{
-      const payload={carrier_user_id:carrierId,driver_id:driverSelect.value||null,truck_profile_id:truckSelect.value||null,
+      const driverChoice=driverSelect.value||'';
+      const payload={carrier_user_id:carrierId,
+        driver_id:driverChoice.startsWith('record:')?driverChoice.slice(7):null,
+        driver_user_id:driverChoice.startsWith('profile:')?driverChoice.slice(8):null,
+        truck_profile_id:truckSelect.value||null,
         created_by:user.id,status:'draft',internal_notes:inputs.internal_notes.value.trim()||null};
       for(const key of ['po_number','broker_load_number','pickup_number','bol_number','broker_name','broker_contact_name','broker_phone','broker_email','commodity'])payload[key]=inputs[key].value.trim()||null;
       for(const key of ['weight_lbs','miles','deadhead_miles'])payload[key]=inputs[key].value?Number(inputs[key].value):null;
@@ -165,8 +171,11 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     if(error){list.replaceChildren($('div','load-board-empty',error.message));return}
     const ids=(loads||[]).map(x=>x.id);
     let financials=[],stops=[],documents=[];
-    const driverNames=new Map();
-    if(!isDriver && loads?.length){const carrierIds=[...new Set(loads.map(x=>x.carrier_user_id))];const {data:driverRows,error:driverError}=await supabase.from('carrier_drivers').select('id,display_name').in('carrier_user_id',carrierIds);if(driverError)say(driverError.message,true);(driverRows||[]).forEach(x=>driverNames.set(x.id,x.display_name))}
+    const driverNames=new Map(),driverAccountNames=new Map();
+    if(!isDriver && loads?.length){const carrierIds=[...new Set(loads.map(x=>x.carrier_user_id))];const [driverRows,accountRows]=await Promise.all([
+      supabase.from('carrier_drivers').select('id,display_name').in('carrier_user_id',carrierIds),
+      supabase.from('driver_profiles').select('user_id,full_name').in('carrier_user_id',carrierIds)
+    ]);if(driverRows.error)say(driverRows.error.message,true);if(accountRows.error)say(accountRows.error.message,true);(driverRows.data||[]).forEach(x=>driverNames.set(x.id,x.display_name));(accountRows.data||[]).forEach(x=>driverAccountNames.set(x.user_id,x.full_name))}
     if(ids.length){
       const [f,s,d]=await Promise.all([
         isDriver?Promise.resolve({data:[]}):supabase.from('dispatch_load_financials').select('*').in('load_id',ids),
@@ -201,7 +210,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
       const to=$('div');to.append($('small','','DELIVERY'),$('strong','',[d?.city,d?.state].filter(Boolean).join(', ')||'Not entered'),$('span','',fmtDate(d?.appointment_start)));
       route.append(from,arrow,to);
       const meta=$('div','load-card-meta');
-      const metaValues=[['Carrier',carrierName(load.carrier_user_id)],['Driver',isDriver?'You':(driverNames.get(load.driver_id)||'Unassigned')],['Miles',safe(load.miles)],['Deadhead',safe(load.deadhead_miles)],['Weight',load.weight_lbs?Number(load.weight_lbs).toLocaleString()+' lb':'—']];
+      const metaValues=[['Carrier',carrierName(load.carrier_user_id)],['Driver',isDriver?'You':(driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned')],['Miles',safe(load.miles)],['Deadhead',safe(load.deadhead_miles)],['Weight',load.weight_lbs?Number(load.weight_lbs).toLocaleString()+' lb':'—']];
       if(!fixedCarrierId && canManage)metaValues[0][1]=carrierName(load.carrier_user_id);
       metaValues.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',v));meta.append(x)});
       if(!isDriver && fin){const x=$('div');x.append($('small','','Carrier pay'),$('strong','',money(fin.carrier_pay)));meta.append(x);const rpm=$('div');rpm.append($('small','','Carrier RPM'),$('strong','',load.miles>0&&fin.carrier_pay!=null?'
@@ -210,7 +219,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
       const detailPanel=$('div','load-detail-panel');detailPanel.hidden=true;
       detailPanel.append($('h3','','Load details'));
       const info=$('div','load-detail-grid');
-      const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)]];
+      const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)],['Assigned driver',driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned']];
       if(!isDriver&&fin)pairs.push(['Carrier pay',money(fin.carrier_pay)],['Carrier RPM',load.miles>0&&fin.carrier_pay!=null?'
       pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
       detailPanel.append(info);
