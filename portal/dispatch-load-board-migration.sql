@@ -185,3 +185,28 @@ with check(bucket_id='load-documents' and case when (storage.foldername(name))[1
 drop policy if exists "Dispatchers delete dispatch load files" on storage.objects;
 create policy "Dispatchers delete dispatch load files" on storage.objects for delete to authenticated
 using(bucket_id='load-documents' and case when (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then private.can_manage_dispatch_load(((storage.foldername(name))[1])::uuid) else false end);
+
+-- Link authenticated driver accounts independently from carrier-managed employee driver records.
+alter table public.driver_profiles
+  add constraint driver_profiles_carrier_user_user_unique unique (carrier_user_id,user_id);
+alter table public.dispatch_loads add column if not exists driver_user_id uuid;
+alter table public.dispatch_loads
+  add constraint dispatch_loads_driver_user_carrier_fk
+  foreign key (carrier_user_id,driver_user_id)
+  references public.driver_profiles(carrier_user_id,user_id);
+
+create or replace function private.can_access_dispatch_load(target_load_id uuid)
+returns boolean language sql stable security definer set search_path=''
+as $$
+ select (select auth.uid()) is not null and exists(
+  select 1 from public.dispatch_loads l where l.id=target_load_id and (
+   public.is_portal_admin() or l.carrier_user_id=(select auth.uid())
+   or private.is_dispatcher_assigned_to_carrier(l.carrier_user_id)
+   or l.driver_user_id=(select auth.uid())
+   or exists(select 1 from public.carrier_drivers d where d.id=l.driver_id
+     and d.carrier_user_id=l.carrier_user_id and d.auth_user_id=(select auth.uid()))
+  )
+ );
+$$;
+revoke all on function private.can_access_dispatch_load(uuid) from public,anon;
+grant execute on function private.can_access_dispatch_load(uuid) to authenticated;
