@@ -41,9 +41,9 @@ for select to authenticated using(
   and r.role in ('dispatcher','dispatcher_admin')
  )
 );
+-- Platform-owner assignment writes are performed through the guarded SECURITY DEFINER RPCs below.
+-- Direct table writes are intentionally not granted to authenticated clients.
 drop policy if exists "Platform admins manage dispatcher carrier assignments" on public.dispatcher_carrier_assignments;
-create policy "Platform admins manage dispatcher carrier assignments" on public.dispatcher_carrier_assignments
-for all to authenticated using(public.is_portal_admin()) with check(public.is_portal_admin());
 
 drop policy if exists "Dispatchers read assigned carrier profiles" on public.carrier_profiles;
 create policy "Dispatchers read assigned carrier profiles" on public.carrier_profiles
