@@ -77,3 +77,17 @@ grant delete on public.rate_confirmation_intakes to authenticated;
 create policy "Dispatchers delete failed rate confirmation intakes"
 on public.rate_confirmation_intakes for delete to authenticated
 using(private.can_manage_carrier_loads(carrier_user_id) and status in ('uploaded','failed'));
+
+-- Retain the original in the intake bucket and let the normal load-document viewer
+-- resolve its bucket explicitly. Carrier/driver participants can read it only after approval.
+alter table public.dispatch_load_documents add column if not exists storage_bucket text not null default 'load-documents';
+alter table public.dispatch_load_documents add constraint dispatch_load_documents_storage_bucket_check
+ check(storage_bucket in ('load-documents','rate-confirmations'));
+create policy "Load participants read approved rate confirmation originals"
+on storage.objects for select to authenticated using(
+ bucket_id='rate-confirmations' and exists(
+  select 1 from public.rate_confirmation_intakes i
+  where i.original_file_path=name and i.approved_load_id is not null
+    and private.can_access_dispatch_load(i.approved_load_id)
+ )
+);
