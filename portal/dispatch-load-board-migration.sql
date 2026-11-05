@@ -210,3 +210,23 @@ as $$
 $$;
 revoke all on function private.can_access_dispatch_load(uuid) from public,anon;
 grant execute on function private.can_access_dispatch_load(uuid) to authenticated;
+
+-- Preserve appointment and facility-stop edits for detention evidence and audit history.
+create or replace function private.log_dispatch_load_stop_update()
+returns trigger language plpgsql set search_path=''
+as $$
+declare changed jsonb;
+begin
+ changed=jsonb_build_object(
+  'before',jsonb_build_object('stop_order',old.stop_order,'stop_type',old.stop_type,'facility_name',old.facility_name,'address_line_1',old.address_line_1,'city',old.city,'state',old.state,'appointment_type',old.appointment_type,'appointment_start',old.appointment_start,'appointment_end',old.appointment_end,'facility_hours',old.facility_hours,'instructions',old.instructions),
+  'after',jsonb_build_object('stop_order',new.stop_order,'stop_type',new.stop_type,'facility_name',new.facility_name,'address_line_1',new.address_line_1,'city',new.city,'state',new.state,'appointment_type',new.appointment_type,'appointment_start',new.appointment_start,'appointment_end',new.appointment_end,'facility_hours',new.facility_hours,'instructions',new.instructions)
+ );
+ insert into public.dispatch_load_activity(load_id,event_type,summary,details,created_by)
+ values(new.load_id,'stop_updated',upper(new.stop_type)||' stop details updated',changed,(select auth.uid()));
+ return new;
+end;
+$$;
+revoke all on function private.log_dispatch_load_stop_update() from public,anon;
+drop trigger if exists dispatch_load_stops_audit_update on public.dispatch_load_stops;
+create trigger dispatch_load_stops_audit_update after update on public.dispatch_load_stops
+for each row execute function private.log_dispatch_load_stop_update();
