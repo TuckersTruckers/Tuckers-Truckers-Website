@@ -235,7 +235,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
         detailPanel.append(box);
       }
       const docs=docById.get(load.id)||[];
-      if(docs.length){const docBox=$('div','load-detail-docs');docBox.append($('h4','','Documents'));for(const doc of docs){const row=$('div','load-document-row');row.append($('span','',doc.file_name+' · '+doc.document_type.replaceAll('_',' ')));const open=button('Open','button',async()=>{const {data,error}=await supabase.storage.from('load-documents').createSignedUrl(doc.file_path,300);if(error)say(error.message,true);else window.open(data.signedUrl,'_blank','noopener')});row.append(open);docBox.append(row)}detailPanel.append(docBox)}
+      if(docs.length){const docBox=$('div','load-detail-docs');docBox.append($('h4','','Documents'));for(const doc of docs){const row=$('div','load-document-row');row.append($('span','',doc.file_name+' · '+doc.document_type.replaceAll('_',' ')));const open=button('Open','button',async()=>{const {data,error}=await supabase.storage.from(doc.storage_bucket||'load-documents').createSignedUrl(doc.file_path,300);if(error)say(error.message,true);else window.open(data.signedUrl,'_blank','noopener')});row.append(open);docBox.append(row)}detailPanel.append(docBox)}
       if(canManage){
         const upload=$('form','load-document-upload');const type=$('select');[['rate_confirmation','Rate confirmation'],['info_sheet','Info sheet'],['bol','BOL'],['receipt','Receipt'],['other','Other']].forEach(([v,t])=>type.append(new Option(t,v)));
         const file=$('input');file.type='file';file.accept='.pdf,.jpg,.jpeg,.png';file.required=true;
@@ -247,6 +247,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     }
   }
   search.addEventListener('input',()=>refresh());filter.addEventListener('change',()=>refresh());
+  window.addEventListener('tt-loads-updated',refresh);
   await refresh();
 }
 

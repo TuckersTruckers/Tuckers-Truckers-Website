@@ -2,7 +2,7 @@ name: Portal static checks
 
 on:
   push:
-    branches: [feature/separate-carrier-setup-link, feature/carrier-directory-and-portal-logo-navigation]
+    branches: [feature/separate-carrier-setup-link, feature/carrier-directory-and-portal-logo-navigation, phase-2-rate-confirmation-ai]
     paths:
       - "portal/**"
       - "supabase/functions/admin-provision-account/**"
@@ -31,6 +31,9 @@ jobs:
 
       - name: Type-check provisioning Edge Function
         run: deno check supabase/functions/admin-provision-account/index.ts
+
+      - name: Type-check rate confirmation extraction Edge Function
+        run: deno check supabase/functions/rate-confirmation-extract/index.ts
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
