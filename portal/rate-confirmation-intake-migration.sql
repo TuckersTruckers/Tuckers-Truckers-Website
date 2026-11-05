@@ -43,7 +43,7 @@ alter table public.dispatch_load_stops add constraint dispatch_load_stops_stop_t
 create or replace function public.approve_rate_confirmation_intake(target_intake_id uuid, reviewed_data jsonb)
 returns uuid language plpgsql security invoker set search_path=''
 as $$
-declare intake public.rate_confirmation_intakes%rowtype; new_load_id uuid; stop_item jsonb; stop_count integer:=0; pickup_count integer:=0; delivery_count integer:=0; stop_kind text;
+declare intake public.rate_confirmation_intakes%rowtype; new_load_id uuid; stop_item jsonb; stop_count integer:=0; pickup_count integer:=0; delivery_count integer:=0; stop_kind text; appointment_value text;
 begin
  if (select auth.uid()) is null then raise exception 'Authentication required.'; end if;
  select * into intake from public.rate_confirmation_intakes where id=target_intake_id for update;
@@ -59,8 +59,41 @@ begin
   stop_count:=stop_count+1;
   if nullif(stop_item->>'city','') is null or nullif(stop_item->>'state','') is null then raise exception 'Every stop must include a city and state.'; end if;
   if coalesce(stop_item->>'appointment_type','') not in ('appointment','fcfs') then raise exception 'Choose Appointment or FCFS for every stop.'; end if;
+  appointment_value:=nullif(stop_item->>'appointment_start','');
+  if appointment_value is not null and appointment_value !~ '(Z|[+-][0-9]{2}:?[0-9]{2})
+ end loop;
+ if pickup_count<1 or delivery_count<1 then raise exception 'At least one pickup and one delivery must be present.'; end if;
+ insert into public.dispatch_load_financials(load_id,carrier_pay,updated_by) values(new_load_id,nullif(reviewed_data#>>'{shipment,carrier_pay}','')::numeric,(select auth.uid()));
+ insert into public.dispatch_load_documents(load_id,document_type,file_name,file_path,content_type,uploaded_by,notes,storage_bucket) values(new_load_id,'rate_confirmation',intake.file_name,intake.original_file_path,intake.content_type,intake.uploaded_by,'Original uploaded rate confirmation','rate-confirmations');
+ update public.rate_confirmation_intakes set status='approved',reviewed_data=approve_rate_confirmation_intake.reviewed_data,reviewed_by=(select auth.uid()),reviewed_at=now(),approved_load_id=new_load_id,updated_at=now() where id=target_intake_id;
+ return new_load_id;
+end;
+$$;
+revoke all on function public.approve_rate_confirmation_intake(uuid,jsonb) from public,anon;
+grant execute on function public.approve_rate_confirmation_intake(uuid,jsonb) to authenticated;
+
+-- Permit cleanup only for unprocessed uploads or failed extractions.
+grant delete on public.rate_confirmation_intakes to authenticated;
+create policy "Dispatchers delete failed rate confirmation intakes"
+on public.rate_confirmation_intakes for delete to authenticated
+using(private.can_manage_carrier_loads(carrier_user_id) and status in ('uploaded','failed'));
+
+-- Retain the original in the intake bucket and let the normal load-document viewer
+-- resolve its bucket explicitly. Carrier/driver participants can read it only after approval.
+alter table public.dispatch_load_documents add column if not exists storage_bucket text not null default 'load-documents';
+alter table public.dispatch_load_documents add constraint dispatch_load_documents_storage_bucket_check
+ check(storage_bucket in ('load-documents','rate-confirmations'));
+create policy "Load participants read approved rate confirmation originals"
+on storage.objects for select to authenticated using(
+ bucket_id='rate-confirmations' and exists(
+  select 1 from public.rate_confirmation_intakes i
+  where i.original_file_path=name and i.approved_load_id is not null
+    and private.can_access_dispatch_load(i.approved_load_id)
+ )
+);
+ then raise exception 'Appointment times must include an explicit timezone offset.'; end if;
   insert into public.dispatch_load_stops(load_id,stop_order,stop_type,facility_name,address_line_1,city,state,postal_code,appointment_type,appointment_start,facility_hours,contact_name,contact_phone,contact_email,instructions)
-  values(new_load_id,coalesce(nullif(stop_item->>'sequence','')::integer,stop_count),stop_kind,nullif(stop_item->>'facility_name',''),nullif(stop_item->>'address_line_1',''),nullif(stop_item->>'city',''),nullif(stop_item->>'state',''),nullif(stop_item->>'postal_code',''),stop_item->>'appointment_type',nullif(stop_item->>'appointment_start','')::timestamptz,nullif(stop_item->>'facility_hours',''),nullif(stop_item->>'contact_name',''),nullif(stop_item->>'contact_phone',''),nullif(stop_item->>'contact_email',''),nullif(stop_item->>'instructions',''));
+  values(new_load_id,coalesce(nullif(stop_item->>'sequence','')::integer,stop_count),stop_kind,nullif(stop_item->>'facility_name',''),nullif(stop_item->>'address_line_1',''),nullif(stop_item->>'city',''),nullif(stop_item->>'state',''),nullif(stop_item->>'postal_code',''),stop_item->>'appointment_type',appointment_value::timestamptz,nullif(stop_item->>'facility_hours',''),nullif(stop_item->>'contact_name',''),nullif(stop_item->>'contact_phone',''),nullif(stop_item->>'contact_email',''),nullif(stop_item->>'instructions',''));
  end loop;
  if pickup_count<1 or delivery_count<1 then raise exception 'At least one pickup and one delivery must be present.'; end if;
  insert into public.dispatch_load_financials(load_id,carrier_pay,updated_by) values(new_load_id,nullif(reviewed_data#>>'{shipment,carrier_pay}','')::numeric,(select auth.uid()));
