@@ -247,6 +247,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     }
   }
   search.addEventListener('input',()=>refresh());filter.addEventListener('change',()=>refresh());
+  window.addEventListener('tt-loads-updated',refresh);
   await refresh();
 }
 
