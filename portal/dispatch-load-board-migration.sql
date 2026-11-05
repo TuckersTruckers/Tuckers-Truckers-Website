@@ -187,13 +187,20 @@ create policy "Dispatchers delete dispatch load files" on storage.objects for de
 using(bucket_id='load-documents' and case when (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then private.can_manage_dispatch_load(((storage.foldername(name))[1])::uuid) else false end);
 
 -- Link authenticated driver accounts independently from carrier-managed employee driver records.
-alter table public.driver_profiles
-  add constraint driver_profiles_carrier_user_user_unique unique (carrier_user_id,user_id);
+do $
+begin
+ if not exists(select 1 from pg_constraint where conrelid='public.driver_profiles'::regclass and conname='driver_profiles_carrier_user_user_unique') then
+  alter table public.driver_profiles add constraint driver_profiles_carrier_user_user_unique unique(carrier_user_id,user_id);
+ end if;
+end $;
 alter table public.dispatch_loads add column if not exists driver_user_id uuid;
-alter table public.dispatch_loads
-  add constraint dispatch_loads_driver_user_carrier_fk
-  foreign key (carrier_user_id,driver_user_id)
-  references public.driver_profiles(carrier_user_id,user_id);
+do $
+begin
+ if not exists(select 1 from pg_constraint where conrelid='public.dispatch_loads'::regclass and conname='dispatch_loads_driver_user_carrier_fk') then
+  alter table public.dispatch_loads add constraint dispatch_loads_driver_user_carrier_fk
+   foreign key(carrier_user_id,driver_user_id) references public.driver_profiles(carrier_user_id,user_id);
+ end if;
+end $;
 
 create or replace function private.can_access_dispatch_load(target_load_id uuid)
 returns boolean language sql stable security definer set search_path=''
@@ -230,3 +237,14 @@ revoke all on function private.log_dispatch_load_stop_update() from public,anon;
 drop trigger if exists dispatch_load_stops_audit_update on public.dispatch_load_stops;
 create trigger dispatch_load_stops_audit_update after update on public.dispatch_load_stops
 for each row execute function private.log_dispatch_load_stop_update();
+
+-- Keep read policies separate from write policies to avoid duplicate permissive SELECT evaluation.
+drop policy if exists "Platform admins manage dispatcher carrier assignments" on public.dispatcher_carrier_assignments;
+drop policy if exists "Dispatchers manage load stops" on public.dispatch_load_stops;
+create policy "Dispatchers insert load stops" on public.dispatch_load_stops for insert to authenticated with check(private.can_manage_dispatch_load(load_id));
+create policy "Dispatchers update load stops" on public.dispatch_load_stops for update to authenticated using(private.can_manage_dispatch_load(load_id)) with check(private.can_manage_dispatch_load(load_id));
+create policy "Dispatchers delete load stops" on public.dispatch_load_stops for delete to authenticated using(private.can_manage_dispatch_load(load_id));
+drop policy if exists "Dispatchers manage load documents" on public.dispatch_load_documents;
+create policy "Dispatchers insert load documents" on public.dispatch_load_documents for insert to authenticated with check(private.can_manage_dispatch_load(load_id));
+create policy "Dispatchers update load documents" on public.dispatch_load_documents for update to authenticated using(private.can_manage_dispatch_load(load_id)) with check(private.can_manage_dispatch_load(load_id));
+create policy "Dispatchers delete load documents" on public.dispatch_load_documents for delete to authenticated using(private.can_manage_dispatch_load(load_id));
