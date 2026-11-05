@@ -64,7 +64,7 @@ begin
  end loop;
  if pickup_count<1 or delivery_count<1 then raise exception 'At least one pickup and one delivery must be present.'; end if;
  insert into public.dispatch_load_financials(load_id,carrier_pay,updated_by) values(new_load_id,nullif(reviewed_data#>>'{shipment,carrier_pay}','')::numeric,(select auth.uid()));
- insert into public.dispatch_load_documents(load_id,document_type,file_name,file_path,content_type,uploaded_by,notes) values(new_load_id,'rate_confirmation',intake.file_name,intake.original_file_path,intake.content_type,intake.uploaded_by,'Original uploaded rate confirmation');
+ insert into public.dispatch_load_documents(load_id,document_type,file_name,file_path,content_type,uploaded_by,notes,storage_bucket) values(new_load_id,'rate_confirmation',intake.file_name,intake.original_file_path,intake.content_type,intake.uploaded_by,'Original uploaded rate confirmation','rate-confirmations');
  update public.rate_confirmation_intakes set status='approved',reviewed_data=approve_rate_confirmation_intake.reviewed_data,reviewed_by=(select auth.uid()),reviewed_at=now(),approved_load_id=new_load_id,updated_at=now() where id=target_intake_id;
  return new_load_id;
 end;
