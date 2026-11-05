@@ -165,7 +165,7 @@ export function setupOwnerNavigation({ onShowPanel, onOpenPage }) {
       if (!link || link.target === '_blank' || event.defaultPrevented) return;
 
       const href = link.getAttribute('href');
-      if (!href || href.startsWith('#') || /^(?:[a-z]+:|\\/\\/)/i.test(href)) return;
+      if (!href || href.startsWith('#') || /^(?:[a-z]+:|\/\/)/i.test(href)) return;
 
       const url = new URL(href, window.location.href);
       if (url.origin !== window.location.origin || !url.pathname.includes('/portal/')) return;
