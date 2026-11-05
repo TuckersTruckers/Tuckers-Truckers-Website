@@ -42,7 +42,7 @@ export async function initRateConfirmation({supabase,user,role,root}) {
     if(!["application/pdf","image/jpeg","image/png"].includes(f.type))return say("Use a PDF, JPG, or PNG file.",true);
     if(f.size>20*1024*1024)return say("The maximum rate-confirmation size is 20 MB.",true);
     uploadBtn.disabled=true;uploadBtn.textContent="Uploading…";
-    let intakeId=null,path=null;
+    let intakeId=null,path=null,uploaded=false,pathSaved=false;
     try{
       const {data:row,error:rowError}=await supabase.from("rate_confirmation_intakes").insert({
         carrier_user_id:carrierId,uploaded_by:user.id,original_file_path:"pending/"+crypto.randomUUID(),
@@ -51,9 +51,9 @@ export async function initRateConfirmation({supabase,user,role,root}) {
       if(rowError)throw rowError;intakeId=row.id;
       path=carrierId+"/"+intakeId+"/"+crypto.randomUUID()+"-"+f.name.replace(/[^a-zA-Z0-9._-]+/g,"-");
       const {error:upError}=await supabase.storage.from("rate-confirmations").upload(path,f,{contentType:f.type,upsert:false});
-      if(upError)throw upError;
+      if(upError)throw upError;uploaded=true;
       const {error:updateError}=await supabase.from("rate_confirmation_intakes").update({original_file_path:path,updated_at:new Date().toISOString()}).eq("id",intakeId);
-      if(updateError)throw updateError;
+      if(updateError)throw updateError;pathSaved=true;
       uploadBtn.textContent="Extracting…";
       const {data:result,error:invokeError}=await supabase.functions.invoke("rate-confirmation-extract",{body:{intake_id:intakeId}});
       if(invokeError)throw invokeError;
@@ -61,8 +61,12 @@ export async function initRateConfirmation({supabase,user,role,root}) {
       say("Extraction finished. Review every field before approving the load.");
       file.value="";await refresh();await openReview(intakeId);
     }catch(e){
-      if(path)await supabase.storage.from("rate-confirmations").remove([path]);
-      if(intakeId)await supabase.from("rate_confirmation_intakes").update({status:"failed",extraction_error:e.message||String(e)}).eq("id",intakeId);
+      if(!pathSaved){
+        if(uploaded&&path)await supabase.storage.from("rate-confirmations").remove([path]);
+        if(intakeId)await supabase.from("rate_confirmation_intakes").delete().eq("id",intakeId);
+      }else if(intakeId){
+        await supabase.from("rate_confirmation_intakes").update({status:"failed",extraction_error:e.message||String(e)}).eq("id",intakeId);
+      }
       say(e.message||String(e),true);await refresh();
     }finally{uploadBtn.disabled=false;uploadBtn.textContent="Upload and extract"}
   }
