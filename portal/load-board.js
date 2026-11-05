@@ -220,8 +220,8 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
       detailPanel.append($('h3','','Load details'));
       const info=$('div','load-detail-grid');
       const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)],['Assigned driver',isDriver?'You':(driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned')]];
-      const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)],['Assigned driver',isDriver?'You':(driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned')]];
       if(!isDriver&&fin)pairs.push(['Carrier pay',money(fin.carrier_pay)],['Carrier RPM',load.miles>0&&fin.carrier_pay!=null?'$'+(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—'],['Market RPM',fin.market_rpm??'—'],['Market RPM source',fin.market_rpm_source??'Not provided']);
+      pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
       detailPanel.append(info);
       if(canManage){const statusRow=$('div','load-status-editor');const statusSelect=$('select');[['draft','Draft'],['booked','Booked'],['dispatched','Dispatched'],['at_pickup','At pickup'],['loaded','Loaded'],['in_transit','In transit'],['at_delivery','At delivery'],['delivered','Delivered'],['on_hold','On hold'],['canceled','Canceled']].forEach(([v,t])=>statusSelect.append(new Option(t,v)));statusSelect.value=load.status;const updateStatus=button('Update status','button',async()=>{updateStatus.disabled=true;const {error}=await supabase.from('dispatch_loads').update({status:statusSelect.value}).eq('id',load.id);updateStatus.disabled=false;if(error)say(error.message,true);else{say('Load status updated.');await refresh()}});statusRow.append($('span','','Status'),statusSelect,updateStatus);detailPanel.append(statusRow)}
       for(const st of ss){
@@ -249,3 +249,4 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
   search.addEventListener('input',()=>refresh());filter.addEventListener('change',()=>refresh());
   await refresh();
 }
+
