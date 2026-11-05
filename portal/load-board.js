@@ -165,6 +165,8 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     if(error){list.replaceChildren($('div','load-board-empty',error.message));return}
     const ids=(loads||[]).map(x=>x.id);
     let financials=[],stops=[],documents=[];
+    const driverNames=new Map();
+    if(!isDriver && loads?.length){const carrierIds=[...new Set(loads.map(x=>x.carrier_user_id))];const {data:driverRows,error:driverError}=await supabase.from('carrier_drivers').select('id,display_name').in('carrier_user_id',carrierIds);if(driverError)say(driverError.message,true);(driverRows||[]).forEach(x=>driverNames.set(x.id,x.display_name))}
     if(ids.length){
       const [f,s,d]=await Promise.all([
         isDriver?Promise.resolve({data:[]}):supabase.from('dispatch_load_financials').select('*').in('load_id',ids),
@@ -199,11 +201,111 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
       const to=$('div');to.append($('small','','DELIVERY'),$('strong','',[d?.city,d?.state].filter(Boolean).join(', ')||'Not entered'),$('span','',fmtDate(d?.appointment_start)));
       route.append(from,arrow,to);
       const meta=$('div','load-card-meta');
-      [['Carrier',carrierName(load.carrier_user_id)],['Driver',load.driver_id?'Assigned':'Unassigned'],['Miles',safe(load.miles)],['Weight',load.weight_lbs?Number(load.weight_lbs).toLocaleString()+' lb':'—']];
-      const metaValues=[['Carrier',carrierName(load.carrier_user_id)],['Driver',load.driver_id?'Assigned':'Unassigned'],['Miles',safe(load.miles)],['Weight',load.weight_lbs?Number(load.weight_lbs).toLocaleString()+' lb':'—']];
+      const metaValues=[['Carrier',carrierName(load.carrier_user_id)],['Driver',isDriver?'You':(driverNames.get(load.driver_id)||'Unassigned')],['Miles',safe(load.miles)],['Deadhead',safe(load.deadhead_miles)],['Weight',load.weight_lbs?Number(load.weight_lbs).toLocaleString()+' lb':'—']];
       if(!fixedCarrierId && canManage)metaValues[0][1]=carrierName(load.carrier_user_id);
       metaValues.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',v));meta.append(x)});
-      if(!isDriver && fin){const x=$('div');x.append($('small','','Carrier pay'),$('strong','',money(fin.carrier_pay)));meta.append(x)}
+      if(!isDriver && fin){const x=$('div');x.append($('small','','Carrier pay'),$('strong','',money(fin.carrier_pay)));meta.append(x);const rpm=$('div');rpm.append($('small','','Carrier RPM'),$('strong','',load.miles>0&&fin.carrier_pay!=null?'
+      const actions=$('div','load-card-actions');
+      const detail=button('View details','button',()=>detailPanel.hidden=!detailPanel.hidden);
+      const detailPanel=$('div','load-detail-panel');detailPanel.hidden=true;
+      detailPanel.append($('h3','','Load details'));
+      const info=$('div','load-detail-grid');
+      const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)]];
+      if(!isDriver&&fin)pairs.push(['Carrier pay',money(fin.carrier_pay)],['Carrier RPM',load.miles>0&&fin.carrier_pay!=null?'
+      pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
+      detailPanel.append(info);
+      if(canManage){const statusRow=$('div','load-status-editor');const statusSelect=$('select');[['draft','Draft'],['booked','Booked'],['dispatched','Dispatched'],['at_pickup','At pickup'],['loaded','Loaded'],['in_transit','In transit'],['at_delivery','At delivery'],['delivered','Delivered'],['on_hold','On hold'],['canceled','Canceled']].forEach(([v,t])=>statusSelect.append(new Option(t,v)));statusSelect.value=load.status;const updateStatus=button('Update status','button',async()=>{updateStatus.disabled=true;const {error}=await supabase.from('dispatch_loads').update({status:statusSelect.value}).eq('id',load.id);updateStatus.disabled=false;if(error)say(error.message,true);else{say('Load status updated.');await refresh()}});statusRow.append($('span','','Status'),statusSelect,updateStatus);detailPanel.append(statusRow)}
+      for(const st of ss){
+        const box=$('div','load-detail-stop');box.append($('h4','',st.stop_type.toUpperCase()+' · '+(st.facility_name||'Facility')));
+        const address=[st.address_line_1,st.address_line_2,st.city,st.state,st.postal_code].filter(Boolean).join(', ');
+        box.append($('p','',address||'Address not entered'));
+        if(address){const links=$('div','load-inline-links');const copy=button('Copy address','button',()=>{if(!navigator.clipboard)return say('Clipboard access is unavailable in this browser.',true);navigator.clipboard.writeText(address).then(()=>say('Address copied.')).catch(()=>say('Could not copy address.',true))});const map=$('a','button','Open map');map.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(address);map.target='_blank';map.rel='noopener';links.append(copy,map);box.append(links)}
+        box.append($('p','',st.appointment_type==='fcfs'?'FCFS':fmtDate(st.appointment_start)),$('p','',st.facility_hours||''),$('p','',st.instructions||''));
+        if(st.contact_phone){const a=$('a','','Call facility');a.href='tel:'+st.contact_phone;box.append(a)}
+        if(st.contact_email){const a=$('a','','Email facility');a.href='mailto:'+st.contact_email;box.append(a)}
+        detailPanel.append(box);
+      }
+      const docs=docById.get(load.id)||[];
+      if(docs.length){const docBox=$('div','load-detail-docs');docBox.append($('h4','','Documents'));for(const doc of docs){const row=$('div','load-document-row');row.append($('span','',doc.file_name+' · '+doc.document_type.replaceAll('_',' ')));const open=button('Open','button',async()=>{const {data,error}=await supabase.storage.from('load-documents').createSignedUrl(doc.file_path,300);if(error)say(error.message,true);else window.open(data.signedUrl,'_blank','noopener')});row.append(open);docBox.append(row)}detailPanel.append(docBox)}
+      if(canManage){
+        const upload=$('form','load-document-upload');const type=$('select');[['rate_confirmation','Rate confirmation'],['info_sheet','Info sheet'],['bol','BOL'],['receipt','Receipt'],['other','Other']].forEach(([v,t])=>type.append(new Option(t,v)));
+        const file=$('input');file.type='file';file.accept='.pdf,.jpg,.jpeg,.png';file.required=true;
+        upload.append(type,file);const upBtn=$('button','button','Upload document');upBtn.type='submit';upload.append(upBtn);
+        upload.addEventListener('submit',async e=>{e.preventDefault();if(!file.files[0])return;upBtn.disabled=true;try{const f=file.files[0];if(!['application/pdf','image/jpeg','image/png'].includes(f.type)||f.size>52428800)throw new Error('Use a PDF, JPG, or PNG under 50 MB.');const path=load.id+'/'+crypto.randomUUID()+'-'+f.name.replace(/[^a-zA-Z0-9._-]+/g,'-');const {error:u}=await supabase.storage.from('load-documents').upload(path,f,{contentType:f.type,upsert:false});if(u)throw u;const {error:ins}=await supabase.from('dispatch_load_documents').insert({load_id:load.id,document_type:type.value,file_name:f.name,file_path:path,content_type:f.type,uploaded_by:user.id});if(ins){await supabase.storage.from('load-documents').remove([path]);throw ins}say('Document uploaded.');await refresh()}catch(e){say(e.message,true)}finally{upBtn.disabled=false}});
+        detailPanel.append(upload);
+      }
+      actions.append(detail);card.append(top,route,meta,actions,detailPanel);list.append(card);
+    }
+  }
+  search.addEventListener('input',()=>refresh());filter.addEventListener('change',()=>refresh());
+  await refresh();
+}
++(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—'));meta.append(rpm)}
+      const actions=$('div','load-card-actions');
+      const detail=button('View details','button',()=>detailPanel.hidden=!detailPanel.hidden);
+      const detailPanel=$('div','load-detail-panel');detailPanel.hidden=true;
+      detailPanel.append($('h3','','Load details'));
+      const info=$('div','load-detail-grid');
+      const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)]];
+      if(!isDriver&&fin)pairs.push(['Carrier pay',money(fin.carrier_pay)],['Market RPM',fin.market_rpm??'—'],['Market RPM source',fin.market_rpm_source??'Not provided']);
+      pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
+      detailPanel.append(info);
+      for(const st of ss){
+        const box=$('div','load-detail-stop');box.append($('h4','',st.stop_type.toUpperCase()+' · '+(st.facility_name||'Facility')));
+        const address=[st.address_line_1,st.address_line_2,st.city,st.state,st.postal_code].filter(Boolean).join(', ');
+        box.append($('p','',address||'Address not entered'));
+        if(address){const links=$('div','load-inline-links');const copy=button('Copy address','button',()=>navigator.clipboard?.writeText(address).then(()=>say('Address copied.')).catch(()=>say('Could not copy address.',true)));const map=$('a','button','Open map');map.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(address);map.target='_blank';map.rel='noopener';links.append(copy,map);box.append(links)}
+        box.append($('p','',st.appointment_type==='fcfs'?'FCFS':fmtDate(st.appointment_start)),$('p','',st.facility_hours||''),$('p','',st.instructions||''));
+        if(st.contact_phone){const a=$('a','','Call facility');a.href='tel:'+st.contact_phone;box.append(a)}
+        if(st.contact_email){const a=$('a','','Email facility');a.href='mailto:'+st.contact_email;box.append(a)}
+        detailPanel.append(box);
+      }
+      const docs=docById.get(load.id)||[];
+      if(docs.length){const docBox=$('div','load-detail-docs');docBox.append($('h4','','Documents'));for(const doc of docs){const row=$('div','load-document-row');row.append($('span','',doc.file_name+' · '+doc.document_type.replaceAll('_',' ')));const open=button('Open','button',async()=>{const {data,error}=await supabase.storage.from('load-documents').createSignedUrl(doc.file_path,300);if(error)say(error.message,true);else window.open(data.signedUrl,'_blank','noopener')});row.append(open);docBox.append(row)}detailPanel.append(docBox)}
+      if(canManage){
+        const upload=$('form','load-document-upload');const type=$('select');[['rate_confirmation','Rate confirmation'],['info_sheet','Info sheet'],['bol','BOL'],['receipt','Receipt'],['other','Other']].forEach(([v,t])=>type.append(new Option(t,v)));
+        const file=$('input');file.type='file';file.accept='.pdf,.jpg,.jpeg,.png';file.required=true;
+        const up=button('Upload document','button',async()=>{});
+        upload.append(type,file);const upBtn=$('button','button','Upload document');upBtn.type='submit';upload.append(upBtn);
+        upload.addEventListener('submit',async e=>{e.preventDefault();if(!file.files[0])return;upBtn.disabled=true;try{const f=file.files[0];if(!['application/pdf','image/jpeg','image/png'].includes(f.type)||f.size>52428800)throw new Error('Use a PDF, JPG, or PNG under 50 MB.');const path=load.id+'/'+crypto.randomUUID()+'-'+f.name.replace(/[^a-zA-Z0-9._-]+/g,'-');const {error:u}=await supabase.storage.from('load-documents').upload(path,f,{contentType:f.type,upsert:false});if(u)throw u;const {error:ins}=await supabase.from('dispatch_load_documents').insert({load_id:load.id,document_type:type.value,file_name:f.name,file_path:path,content_type:f.type,uploaded_by:user.id});if(ins){await supabase.storage.from('load-documents').remove([path]);throw ins}say('Document uploaded.');await refresh()}catch(e){say(e.message,true)}finally{upBtn.disabled=false}});
+        detailPanel.append(upload);
+      }
+      actions.append(detail);card.append(top,route,meta,actions,detailPanel);list.append(card);
+    }
+  }
+  search.addEventListener('input',()=>refresh());filter.addEventListener('change',()=>refresh());
+  await refresh();
+}
++(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—'],['Market RPM',fin.market_rpm??'—'],['Market RPM source',fin.market_rpm_source??'Not provided']);
+      pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
+      detailPanel.append(info);
+      for(const st of ss){
+        const box=$('div','load-detail-stop');box.append($('h4','',st.stop_type.toUpperCase()+' · '+(st.facility_name||'Facility')));
+        const address=[st.address_line_1,st.address_line_2,st.city,st.state,st.postal_code].filter(Boolean).join(', ');
+        box.append($('p','',address||'Address not entered'));
+        if(address){const links=$('div','load-inline-links');const copy=button('Copy address','button',()=>navigator.clipboard?.writeText(address).then(()=>say('Address copied.')).catch(()=>say('Could not copy address.',true)));const map=$('a','button','Open map');map.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(address);map.target='_blank';map.rel='noopener';links.append(copy,map);box.append(links)}
+        box.append($('p','',st.appointment_type==='fcfs'?'FCFS':fmtDate(st.appointment_start)),$('p','',st.facility_hours||''),$('p','',st.instructions||''));
+        if(st.contact_phone){const a=$('a','','Call facility');a.href='tel:'+st.contact_phone;box.append(a)}
+        if(st.contact_email){const a=$('a','','Email facility');a.href='mailto:'+st.contact_email;box.append(a)}
+        detailPanel.append(box);
+      }
+      const docs=docById.get(load.id)||[];
+      if(docs.length){const docBox=$('div','load-detail-docs');docBox.append($('h4','','Documents'));for(const doc of docs){const row=$('div','load-document-row');row.append($('span','',doc.file_name+' · '+doc.document_type.replaceAll('_',' ')));const open=button('Open','button',async()=>{const {data,error}=await supabase.storage.from('load-documents').createSignedUrl(doc.file_path,300);if(error)say(error.message,true);else window.open(data.signedUrl,'_blank','noopener')});row.append(open);docBox.append(row)}detailPanel.append(docBox)}
+      if(canManage){
+        const upload=$('form','load-document-upload');const type=$('select');[['rate_confirmation','Rate confirmation'],['info_sheet','Info sheet'],['bol','BOL'],['receipt','Receipt'],['other','Other']].forEach(([v,t])=>type.append(new Option(t,v)));
+        const file=$('input');file.type='file';file.accept='.pdf,.jpg,.jpeg,.png';file.required=true;
+        const up=button('Upload document','button',async()=>{});
+        upload.append(type,file);const upBtn=$('button','button','Upload document');upBtn.type='submit';upload.append(upBtn);
+        upload.addEventListener('submit',async e=>{e.preventDefault();if(!file.files[0])return;upBtn.disabled=true;try{const f=file.files[0];if(!['application/pdf','image/jpeg','image/png'].includes(f.type)||f.size>52428800)throw new Error('Use a PDF, JPG, or PNG under 50 MB.');const path=load.id+'/'+crypto.randomUUID()+'-'+f.name.replace(/[^a-zA-Z0-9._-]+/g,'-');const {error:u}=await supabase.storage.from('load-documents').upload(path,f,{contentType:f.type,upsert:false});if(u)throw u;const {error:ins}=await supabase.from('dispatch_load_documents').insert({load_id:load.id,document_type:type.value,file_name:f.name,file_path:path,content_type:f.type,uploaded_by:user.id});if(ins){await supabase.storage.from('load-documents').remove([path]);throw ins}say('Document uploaded.');await refresh()}catch(e){say(e.message,true)}finally{upBtn.disabled=false}});
+        detailPanel.append(upload);
+      }
+      actions.append(detail);card.append(top,route,meta,actions,detailPanel);list.append(card);
+    }
+  }
+  search.addEventListener('input',()=>refresh());filter.addEventListener('change',()=>refresh());
+  await refresh();
+}
++(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—'));meta.append(rpm)}
       const actions=$('div','load-card-actions');
       const detail=button('View details','button',()=>detailPanel.hidden=!detailPanel.hidden);
       const detailPanel=$('div','load-detail-panel');detailPanel.hidden=true;
