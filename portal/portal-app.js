@@ -22,13 +22,62 @@ export function setupOwnerNavigation({ onShowPanel, onOpenPage }) {
 
   appLayout.classList.add('owner-navigation');
 
+  function renderCarrierWorkspaceSecondary() {
+    const doc = frame.contentDocument;
+    const carrierName = doc?.getElementById('title')?.textContent?.trim();
+    secondaryTitle.textContent = carrierName || 'Carrier Workspace';
+    secondaryCopy.textContent = 'Selected carrier account · owner view';
+    secondary.replaceChildren();
+    const groups = [
+      ['HOME', [['Dashboard', 'dashboard-panel']]],
+      ['LOAD BOARD', [['Load Board', 'loads-panel'], ['Load Lookup', 'load-lookup-panel']]],
+      ['EQUIPMENT', [['Equipment', 'equipment-panel']]],
+      ['DRIVERS', [['Drivers', 'drivers-panel']]],
+      ['FINANCE', [['Revenue', 'finance-panel'], ['Dispatch Invoices', 'dispatch-invoices-panel'], ['Factoring Invoices', 'factoring-invoices-panel'], ['Expenses', 'expenses-panel']]],
+      ['BROKERS', [['Brokers', 'brokers-panel'], ['Preferred Contacts', 'preferred-contacts-panel']]],
+      ['ADMINISTRATION', [['Company Profile', 'company-profile'], ['Company Documents', 'company-documents']]]
+    ];
+    for (const [headingText, items] of groups) {
+      const heading = document.createElement('div');
+      heading.className = 'secondary-group-heading';
+      heading.textContent = headingText;
+      secondary.append(heading);
+      for (const [label, panelId] of items) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'secondary-nav-link' + (label === 'Dashboard' ? ' active' : '');
+        button.textContent = label;
+        button.addEventListener('click', () => {
+          secondary.querySelectorAll('.secondary-nav-link').forEach(item => item.classList.toggle('active', item === button));
+          frame.contentWindow?.postMessage({ type: 'carrier-workspace:navigate', panelId }, window.location.origin);
+        });
+        secondary.append(button);
+      }
+    }
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'secondary-nav-link';
+    back.textContent = '← Carrier Directory';
+    back.style.marginTop = '18px';
+    back.addEventListener('click', () => onOpenPage('carriers.html', 'Carrier Directory'));
+    secondary.append(back);
+    secondarySidebar.hidden = false;
+  }
+
   frame.addEventListener('load', () => {
     try {
       const doc = frame.contentDocument;
       if (!doc) return;
       const style = doc.createElement('style');
-      style.textContent = 'header,footer,.portal-sidebar,.portal-topbar{display:none!important}.portal-main{margin:0!important}.portal-main .wrap,main{width:100%!important;max-width:none!important;margin:0!important;padding:22px!important}.portal-footer{display:none!important}body{background:#f5f5f5!important}';
+      const isCarrierWorkspace = new URL(frame.contentWindow.location.href).pathname.endsWith('/carrier-workspace.html');
+      style.textContent = 'header,footer,.portal-sidebar,.portal-topbar{display:none!important}.portal-main{margin:0!important}.portal-main .wrap,main{width:100%!important;max-width:none!important;margin:0!important;padding:22px!important}.portal-footer{display:none!important}body{background:#f5f5f5!important}' +
+        (isCarrierWorkspace ? '.carrier-workspace-nav{display:none!important}.carrier-workspace-shell{display:block!important;grid-template-columns:minmax(0,1fr)!important;gap:0!important;margin:0!important;padding:0!important}.carrier-workspace-content{width:100%!important;min-width:0!important}' : '');
       doc.head.append(style);
+      if (isCarrierWorkspace) renderCarrierWorkspaceSecondary();
+      else if (new URL(frame.contentWindow.location.href).pathname.endsWith('/carriers.html') &&
+        document.querySelector('.primary-nav-link.active')?.dataset.section === 'Carriers') {
+        renderSecondary('Carriers', 'Carrier Directory');
+      }
     } catch (error) {
       console.warn('Portal section styling could not be applied.', error);
     }
