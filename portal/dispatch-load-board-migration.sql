@@ -248,3 +248,13 @@ drop policy if exists "Dispatchers manage load documents" on public.dispatch_loa
 create policy "Dispatchers insert load documents" on public.dispatch_load_documents for insert to authenticated with check(private.can_manage_dispatch_load(load_id));
 create policy "Dispatchers update load documents" on public.dispatch_load_documents for update to authenticated using(private.can_manage_dispatch_load(load_id)) with check(private.can_manage_dispatch_load(load_id));
 create policy "Dispatchers delete load documents" on public.dispatch_load_documents for delete to authenticated using(private.can_manage_dispatch_load(load_id));
+
+-- Cover new load-board foreign keys and common tenant/assignment lookups.
+create index if not exists dispatch_loads_created_by_idx on public.dispatch_loads(created_by);
+create index if not exists dispatch_loads_carrier_driver_idx on public.dispatch_loads(carrier_user_id,driver_id);
+create index if not exists dispatch_loads_carrier_driver_user_idx on public.dispatch_loads(carrier_user_id,driver_user_id);
+create index if not exists dispatch_loads_carrier_truck_profile_idx on public.dispatch_loads(carrier_user_id,truck_profile_id);
+create index if not exists dispatch_load_financials_updated_by_idx on public.dispatch_load_financials(updated_by);
+create index if not exists dispatch_load_documents_uploaded_by_idx on public.dispatch_load_documents(uploaded_by);
+create index if not exists dispatch_load_activity_created_by_idx on public.dispatch_load_activity(created_by);
+create index if not exists dispatcher_carrier_assignments_assigned_by_idx on public.dispatcher_carrier_assignments(assigned_by);
