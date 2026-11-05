@@ -122,6 +122,11 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
       const q=record?supabase.from('carrier_equipment').update(payload).eq('id',record.id).eq('carrier_user_id',carrierUserId):supabase.from('carrier_equipment').insert(payload);
       const {error}=await q;if(error)throw error;say('Equipment saved.');await renderEquipment();
     },record?'Save equipment':(isTrailer?'Add trailer':'Add tractor'));
+    if(isTrailer){
+      const clearanceNames=['interior_length_inches','interior_width_inches','interior_height_inches','door_width_inches','door_height_inches'];
+      const toggleClearance=()=>{const openDeck=['flatbed','step_deck','conestoga'].includes(refs.equipment_category.value);for(const name of clearanceNames){const wrap=refs[name]?.closest('.fleet-field');if(wrap)wrap.hidden=openDeck;}};
+      refs.equipment_category.addEventListener('change',toggleClearance);toggleClearance();
+    }
     const cancel=el('button','button','Cancel');cancel.type='button';cancel.addEventListener('click',()=>c.remove());form.querySelector('.fleet-actions').append(cancel);
     return c;
   };
@@ -137,6 +142,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
     const data=await loadEquipment();const tractors=data.filter(x=>x.equipment_kind==='tractor'),trailers=data.filter(x=>x.equipment_kind==='trailer');
     for(const [title,items] of [['Tractors',tractors],['Trailers',trailers]]){const group=el('section','fleet-group');group.append(el('h3','',title));if(!items.length)group.append(el('p','muted','No '+title.toLowerCase()+' saved yet.'));items.forEach(x=>group.append(equipmentCard(x)));list.append(group)}
     await renderProfiles(data);
+    await refreshProfileOptions();
   };
   const renderProfiles = async equipment => {
     const box=equipmentRoot.querySelector('[data-profile-list]');box.replaceChildren();
@@ -156,7 +162,5 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   const profileList=el('div');profileList.dataset.profileList='';profiles.append(el('h3','','Saved combinations'),profileList);equipmentRoot.append(profiles);
   power.addEventListener('change',()=>{trailer.disabled=power.checked;if(power.checked)trailer.value=''});
   const refreshProfileOptions=async()=>{const [eq,ds]=await Promise.all([loadEquipment(),loadDrivers()]);const tractors=eq.filter(x=>x.equipment_kind==='tractor'),trailers=eq.filter(x=>x.equipment_kind==='trailer');tractor.replaceChildren(new Option('Select tractor…',''));tractors.forEach(x=>tractor.append(new Option((x.unit_number?'Unit '+x.unit_number+' · ':'')+[x.year,x.make,x.model].filter(Boolean).join(' ')||x.equipment_category,x.id)));trailer.replaceChildren(new Option('No trailer / choose later',''));trailers.forEach(x=>trailer.append(new Option((x.unit_number?'Unit '+x.unit_number+' · ':'')+[x.year,x.make,x.model].filter(Boolean).join(' ')||x.equipment_category,x.id)));driverChecks.replaceChildren(el('strong','fleet-full','Assign drivers (optional)'));ds.forEach(d=>{const label=el('label');const input=el('input');input.type='checkbox';input.value=d.id;label.append(input,document.createTextNode(' '+d.display_name));driverChecks.append(label)})};
-  const originalRenderEquipment=renderEquipment;
-  renderEquipment=async()=>{await originalRenderEquipment();await refreshProfileOptions()};
   await renderDrivers();await renderEquipment();
 }
