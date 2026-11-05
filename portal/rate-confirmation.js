@@ -50,10 +50,10 @@ export async function initRateConfirmation({supabase,user,role,root}) {
       }).select("id").single();
       if(rowError)throw rowError;intakeId=row.id;
       path=carrierId+"/"+intakeId+"/"+crypto.randomUUID()+"-"+f.name.replace(/[^a-zA-Z0-9._-]+/g,"-");
-      const {error:upError}=await supabase.storage.from("rate-confirmations").upload(path,f,{contentType:f.type,upsert:false});
-      if(upError)throw upError;uploaded=true;
       const {error:updateError}=await supabase.from("rate_confirmation_intakes").update({original_file_path:path,updated_at:new Date().toISOString()}).eq("id",intakeId);
       if(updateError)throw updateError;pathSaved=true;
+      const {error:upError}=await supabase.storage.from("rate-confirmations").upload(path,f,{contentType:f.type,upsert:false});
+      if(upError)throw upError;uploaded=true;
       uploadBtn.textContent="Extracting…";
       const {data:result,error:invokeError}=await supabase.functions.invoke("rate-confirmation-extract",{body:{intake_id:intakeId}});
       if(invokeError)throw invokeError;
@@ -61,8 +61,8 @@ export async function initRateConfirmation({supabase,user,role,root}) {
       say("Extraction finished. Review every field before approving the load.");
       file.value="";await refresh();await openReview(intakeId);
     }catch(e){
-      if(!pathSaved){
-        if(uploaded&&path)await supabase.storage.from("rate-confirmations").remove([path]);
+      if(!uploaded){
+        if(pathSaved&&path)await supabase.storage.from("rate-confirmations").remove([path]);
         if(intakeId)await supabase.from("rate_confirmation_intakes").delete().eq("id",intakeId);
       }else if(intakeId){
         await supabase.from("rate_confirmation_intakes").update({status:"failed",extraction_error:e.message||String(e)}).eq("id",intakeId);
