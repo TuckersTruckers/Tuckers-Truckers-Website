@@ -123,7 +123,7 @@ export async function initRateConfirmation({supabase,user,role,root}) {
     }
     const stopsSection=$("div","rate-intake-review-section");stopsSection.append($("h4","","Pickup, delivery, and additional stops"));
     const stopCards=$("div","rate-intake-stop-list");
-    (values.stops||[]).forEach((stop,index)=>{
+    function renderStop(stop,index){
       const stopCard=$("div","rate-intake-stop-card");stopCard.append($("h5","","Stop "+(index+1)));
       const grid=$("div","rate-intake-review-grid");
       const fields=[
@@ -139,11 +139,17 @@ export async function initRateConfirmation({supabase,user,role,root}) {
         input.addEventListener("change",()=>{stop[key]=input.value||null});
         input.addEventListener("input",()=>{stop[key]=input.value||null});
       }
-      stopCards.append(stopCard);stopCard.append(grid);
-      const seq=field(stopCard,"Stop sequence",stop.sequence,"number");seq.addEventListener("input",()=>stop.sequence=Number(seq.value)||index+1);
+      stopCard.append(grid);
+      const seq=field(stopCard,"Stop sequence",stop.sequence||index+1,"number");seq.addEventListener("input",()=>stop.sequence=Number(seq.value)||index+1);
+      stopCards.append(stopCard);
+    }
+    (values.stops||[]).forEach(renderStop);
+    const addStop=btn("Add another stop",()=>{
+      values.stops??=[];
+      const stop={sequence:values.stops.length+1,stop_type:"other",facility_name:null,address_line_1:null,city:null,state:null,postal_code:null,appointment_type:"unknown",appointment_start:null,facility_hours:null,contact_name:null,contact_phone:null,contact_email:null,instructions:null};
+      values.stops.push(stop);renderStop(stop,values.stops.length-1);
     });
-    if(!(values.stops||[]).length)stopCards.append($("p","rate-intake-warning","No stops were identified. You must add at least one pickup and one delivery manually before approval."));
-    stopsSection.append(stopCards);review.append(stopsSection);
+    stopsSection.append(stopCards,addStop);review.append(stopsSection);
     const notes=$("div","rate-intake-review-section");notes.append($("h4","","AI extraction notes"));
     notes.append($("p","",values.document_notes||"No additional notes from the extraction."));
     const internal=field(notes,"Internal dispatch notes",values.internal_notes||"");internal.addEventListener("input",()=>values.internal_notes=internal.value);
