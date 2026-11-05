@@ -143,3 +143,13 @@ drop policy if exists "Load participants read approved rate confirmation origina
 create policy "Load participants read approved rate confirmation originals"
 on storage.objects for select to authenticated
 using(bucket_id='rate-confirmations' and private.can_read_approved_rate_confirmation(name));
+
+drop policy if exists "Dispatchers delete rate confirmation originals" on storage.objects;
+create policy "Dispatchers delete unprocessed rate confirmation originals"
+on storage.objects for delete to authenticated using(
+ bucket_id='rate-confirmations' and exists(
+  select 1 from public.rate_confirmation_intakes i
+  where i.original_file_path=name and i.status in ('uploaded','failed')
+    and private.can_manage_carrier_loads(i.carrier_user_id)
+ )
+);
