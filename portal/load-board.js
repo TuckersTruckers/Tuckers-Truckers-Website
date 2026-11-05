@@ -38,9 +38,9 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     if(error)throw error;
     return data||[];
   }
-  const carrierName = id => carriers.find(c=>c.user_id===id)?.business_name || carriers.find(c=>c.user_id===id)?.company_name || 'Carrier';
-  const selectedCarrier = fixedCarrierId;
   let carrierChoices = carriers;
+  const carrierName = id => carrierChoices.find(c=>c.user_id===id)?.business_name || carrierChoices.find(c=>c.user_id===id)?.company_name || 'Carrier';
+  const selectedCarrier = fixedCarrierId;
   if(selectedCarrier){
     const {data,error}=await supabase.from('carrier_profiles').select('user_id,business_name,company_name,mc_number').eq('user_id',selectedCarrier).maybeSingle();
     if(error) say(error.message,true);
@@ -99,7 +99,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
   [pay,market,source,internal].forEach(f=>financialGrid.append(f.wrap));
   const actions=$('div','load-form-actions');
   const save=button('Save and publish load','button primary',()=>submitLoad());
-  const cancel=button('Cancel','button',()=>{formCard.hidden=true;form.reset()});
+  const cancel=button('Cancel','button',()=>{formCard.hidden=true});
   actions.append(save,cancel);
   formCard.append($('h3','','Build a load'),$('p','load-form-help','Enter the load information, assign the carrier and driver, and verify both stops before publishing. Rate-confirmation AI upload is a later phase.'),fieldGrid,stopHeading,stopGrid,financialHeading,financialGrid,actions);
 
@@ -148,13 +148,12 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
         updated_by:user.id,updated_at:new Date().toISOString()};
       const {error:finError}=await supabase.from('dispatch_load_financials').insert(financial);if(finError)throw finError;
       const {error:publishError}=await supabase.from('dispatch_loads').update({status:'booked'}).eq('id',loadId);if(publishError)throw publishError;
-      form.reset();if(fixedCarrierId)carrierSelect.value=fixedCarrierId;formCard.hidden=true;
+      Object.values(inputs).forEach(input=>input.value='');Object.values(stopInputs).forEach(group=>Object.values(group).forEach(input=>input.value=''));pay.input.value='';market.input.value='';source.input.value='';if(fixedCarrierId)carrierSelect.value=fixedCarrierId;driverSelect.value='';truckSelect.value='';formCard.hidden=true;
       say('Load created and published.');await refresh();
     }catch(e){
       say((loadId?'Load saved as a draft, but the remaining setup did not finish: ':'Could not create load: ')+(e.message||e),true);
     }finally{save.disabled=false;save.textContent='Save and publish load'}
   }
-  const form = formCard.querySelector('form') || null;
   // Form fields are independent controls; prevent accidental page submission from browser Enter key.
   fieldGrid.addEventListener('keydown',e=>{if(e.key==='Enter' && e.target.tagName!=='TEXTAREA')e.preventDefault()});
 
