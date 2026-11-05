@@ -95,7 +95,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
   const pay=makeField('Carrier pay ($)','carrier_pay','number');pay.input.min='0';pay.input.step='0.01';
   const market=makeField('Market RPM','market_rpm','number');market.input.min='0';market.input.step='0.0001';
   const source=makeField('Market RPM source','market_rpm_source');
-  const internal=makeField('Internal dispatch notes','internal_notes');
+  const internal=makeField('Internal dispatch notes','internal_notes');inputs.internal_notes=internal.input;
   [pay,market,source,internal].forEach(f=>financialGrid.append(f.wrap));
   const actions=$('div','load-form-actions');
   const save=button('Save and publish load','button primary',()=>submitLoad());
