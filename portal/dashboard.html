@@ -434,6 +434,7 @@
 <footer class="footer">© <span id="year"></span> Tucker's Truckers LLC · Your business stays yours.</footer>
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { setupOwnerNavigation } from './portal-app.js';
 const supabase=createClient('https://bvrlpwkzqmqfcupqjugf.supabase.co','sb_publishable_rK1mYtBCgePRh9gqrn_hwA_7a_zxOLZ');
 const $=id=>document.getElementById(id);
 let user=null, role='unassigned', carriers=[];
@@ -456,54 +457,21 @@ function setMetric(label,value,detail=''){const el=document.createElement('artic
 function feature(title,copy,icon,action,label='Open'){const el=document.createElement('article');el.className='card feature-card';const i=document.createElement('div');i.className='feature-icon';i.textContent=icon;const h=document.createElement('h3');h.textContent=title;const p=document.createElement('p');p.textContent=copy;el.append(i,h,p);if(action){if(action.startsWith('#')){const b=document.createElement('button');b.type='button';b.className='button';b.textContent=label+' →';b.addEventListener('click',()=>activateTab(action.slice(1).replace('-panel','')));el.append(b)}else{const a=document.createElement('a');a.className='button';a.href=action;a.textContent=label+' →';el.append(a)}}$('quick-links').append(el)}
 function ownerNavSetup(){
  const appLayout=document.querySelector('.app-layout');
- const primary=$('tabs');
- const secondary=$('secondary-nav');
- const secondarySidebar=$('secondary-sidebar');
- const secondaryTitle=$('secondary-nav-title');
- const secondaryCopy=$('secondary-nav-copy');
  const frame=$('owner-content-frame');
- appLayout.classList.add('owner-navigation');
- frame.addEventListener('load',()=>{try{const doc=frame.contentDocument;if(!doc)return;const style=doc.createElement('style');style.textContent='header,footer,.portal-sidebar,.portal-topbar{display:none!important}.portal-main{margin:0!important}.portal-main .wrap,main{width:100%!important;max-width:none!important;margin:0!important;padding:22px!important}.portal-footer{display:none!important}body{background:#f5f5f5!important}';doc.head.append(style);}catch(error){console.warn('Portal section styling could not be applied.',error)}});
- const sections={
-  Dashboard:{copy:'Your operations at a glance.',groups:[{heading:'OVERVIEW',items:[['Overview','panel','overview']]}]},
-  'Load Board':{copy:'Load search and dispatch workflows.',groups:[{heading:'LOAD MANAGEMENT',items:[['Load Board','panel','loads'],['Quotes','panel','quotes']]}]},
-  Carriers:{copy:'Manage carrier records, onboarding, and approvals.',groups:[{heading:'OVERVIEW',items:[['Carrier Directory','page','carriers.html']]},{heading:'CARRIER MANAGEMENT',items:[['Add New Carrier','page','admin.html#carrier-panel'],['Pending Approvals','page','pending-accounts.html'],['Carrier Inquiries','page','inquiries.html']]}]},
-  Finance:{copy:'Financial tools and carrier settlement workflows.',groups:[{heading:'FINANCIAL WORKSPACE',items:[['Overview','panel','factoring'],['Factoring','panel','factoring'],['Expenses','panel','expenses']]}]},
-  Administration:{copy:'Control account provisioning, assignments, and platform access.',groups:[{heading:'PLATFORM ADMINISTRATION',items:[['Account Provisioning','page','admin.html#carrier-panel'],['Driver & Carrier Assignments','page','admin.html#driver-panel'],['Dispatcher Access','page','admin.html#dispatcher-assignment-section']]}]}
- };
- const primaryItems=[['Dashboard','layout-dashboard'],['Load Board','clipboard-list'],['Carriers','truck'],['Finance','wallet'],['Administration','settings']];
- function showPanel(id){appLayout.classList.remove('owner-page-open');frame.removeAttribute('src');activateTab(id)}
- function openPage(url,label){appLayout.classList.add('owner-page-open');frame.src=url;frame.title=label+' · Tucker\'s Truckers portal';}
- appLayout.querySelector('.shell').addEventListener('click',event=>{const link=event.target.closest('a[href]');if(!link||link.target==='_blank'||event.defaultPrevented)return;const href=link.getAttribute('href');if(!href||href.startsWith('#')||/^(?:[a-z]+:|\/\/)/i.test(href))return;const url=new URL(href,location.href);if(url.origin!==location.origin||!url.pathname.includes('/portal/'))return;event.preventDefault();openPage(url.pathname.split('/portal/')[1]+url.hash,link.textContent.trim()||'Portal section');});
- function renderSecondary(section,activeLabel){
-  const config=sections[section];secondaryTitle.textContent=section;secondaryCopy.textContent=config.copy;secondary.replaceChildren();
-  for(const group of config.groups){const heading=document.createElement('div');heading.className='secondary-group-heading';heading.textContent=group.heading;secondary.append(heading);
-   for(const item of group.items){const [label,kind,target]=item;const button=document.createElement('button');button.type='button';button.className='secondary-nav-link'+(label===activeLabel?' active':'');button.textContent=label;button.addEventListener('click',()=>{document.querySelectorAll('.secondary-nav-link').forEach(x=>x.classList.toggle('active',x===button));if(kind==='page')openPage(target,label);else showPanel(target)});secondary.append(button)}
+ setupOwnerNavigation({
+  onShowPanel(id){
+   appLayout.classList.remove('owner-page-open');
+   frame.removeAttribute('src');
+   activateTab(id);
+  },
+  onOpenPage(url,label){
+   appLayout.classList.add('owner-page-open');
+   frame.src=url;
+   frame.title=label+' · Tucker\'s Truckers portal';
   }
-  secondarySidebar.hidden=false;
- }
- const primarySidebar=appLayout.querySelector('.sidebar');
- primarySidebar.addEventListener('pointerleave',()=>appLayout.classList.remove('owner-primary-just-selected'));
- function selectSection(section){
-  document.querySelectorAll('.primary-nav-link').forEach(x=>x.classList.toggle('active',x.dataset.section===section));
-  if(section==='Dashboard'){
-   appLayout.classList.remove('owner-primary-just-selected');
-   appLayout.classList.remove('owner-secondary-open');
-   document.body.classList.remove('owner-secondary-open');
-   secondarySidebar.hidden=true;
-   showPanel('overview');
-   return;
-  }
-  appLayout.classList.add('owner-secondary-open','owner-primary-just-selected');
-  document.body.classList.add('owner-secondary-open');
-  const first=sections[section].groups.flatMap(g=>g.items)[0];
-  renderSecondary(section,first[0]);
-  if(first[1]==='page')openPage(first[2],first[0]);else showPanel(first[2]);
- }
- primary.replaceChildren();
- for(const [label,icon] of primaryItems){const button=document.createElement('button');button.type='button';button.className='primary-nav-link';button.dataset.section=label;button.innerHTML='<span class="primary-nav-icon" aria-hidden="true"></span><span></span>';button.querySelector('.primary-nav-icon').textContent=({'Dashboard':'⌂','Load Board':'▤','Carriers':'▰','Finance':'＄','Administration':'⚙'})[label];button.querySelector('span:last-child').textContent=label;button.addEventListener('click',()=>{button.blur();selectSection(label)});primary.append(button)}
- primary.hidden=false;selectSection('Dashboard');
-}function tabSetup(items){const tabs=$('tabs');tabs.replaceChildren();const groups=[['Home',['overview','access']],['Operations',['carriers','drivers','loads','quotes','onboarding']],['Performance & finance',['performance','factoring','expenses']],['Company & network',['brokers','lookup','equipment','company']],['Administration',['admin']]];for(const [groupName,ids] of groups){const entries=items.filter(([id])=>ids.includes(id));if(!entries.length)continue;const details=document.createElement('details');details.className='nav-group';details.open=groupName==='Home';const summary=document.createElement('summary');summary.textContent=groupName;details.append(summary);const subnav=document.createElement('div');subnav.className='tab-subnav';for(const [id,label] of entries){const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.panel=id;b.addEventListener('click',()=>activateTab(id));subnav.append(b)}details.append(subnav);tabs.append(details)}tabs.hidden=false;activateTab('overview')}
+ });
+}
+function tabSetup(items){const tabs=$('tabs');tabs.replaceChildren();const groups=[['Home',['overview','access']],['Operations',['carriers','drivers','loads','quotes','onboarding']],['Performance & finance',['performance','factoring','expenses']],['Company & network',['brokers','lookup','equipment','company']],['Administration',['admin']]];for(const [groupName,ids] of groups){const entries=items.filter(([id])=>ids.includes(id));if(!entries.length)continue;const details=document.createElement('details');details.className='nav-group';details.open=groupName==='Home';const summary=document.createElement('summary');summary.textContent=groupName;details.append(summary);const subnav=document.createElement('div');subnav.className='tab-subnav';for(const [id,label] of entries){const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.panel=id;b.addEventListener('click',()=>activateTab(id));subnav.append(b)}details.append(subnav);tabs.append(details)}tabs.hidden=false;activateTab('overview')}
 function activateTab(id){const ids=['overview','carriers','drivers','loads','quotes','onboarding','admin','access',...moduleSpecs.map(x=>x[0])];for(const key of ids){const panel=$(key+'-panel');if(panel)panel.hidden=key!==id}const buttons=[...document.querySelectorAll('#tabs button')];buttons.forEach(b=>b.classList.toggle('active',b.dataset.panel===id));const active=buttons.find(b=>b.dataset.panel===id);if(active){const group=active.closest('details');document.querySelectorAll('#tabs details').forEach(d=>d.open=d===group)}}
 function row(title,detail,badge,action,actionText){const el=document.createElement('article');el.className='carrier-row';const info=document.createElement('div');const h=document.createElement('h3');h.textContent=title;const p=document.createElement('p');p.textContent=detail;info.append(h,p);if(badge){const b=document.createElement('span');b.className='tag';b.textContent=badge;info.append(b)}el.append(info);if(action){const actions=document.createElement('div');actions.className='carrier-actions';const a=document.createElement('a');a.className='button';a.href=action;a.textContent=actionText||'Open';actions.append(a);el.append(actions)}return el}
 async function init(){
