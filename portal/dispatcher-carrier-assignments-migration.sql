@@ -132,3 +132,72 @@ end;
 $$;
 revoke all on function public.remove_dispatcher_carrier_assignment(uuid) from public,anon;
 grant execute on function public.remove_dispatcher_carrier_assignment(uuid) to authenticated;
+
+-- Keep public RPC entry points SECURITY INVOKER; privileged work lives in private schema
+-- and checks platform-owner authorization explicitly.
+create or replace function private.assign_dispatcher_to_carrier(dispatcher_email text,target_carrier_user_id uuid)
+returns uuid language plpgsql security definer set search_path=''
+as $$
+declare dispatcher_id uuid; assignment_id uuid;
+begin
+ if not public.is_portal_admin() then raise exception 'Only the platform administrator can assign dispatcher access.'; end if;
+ if nullif(trim(dispatcher_email),'') is null then raise exception 'Dispatcher email is required.'; end if;
+ select u.id into dispatcher_id from auth.users u join public.portal_user_roles r on r.user_id=u.id
+ where lower(u.email)=lower(trim(dispatcher_email)) and r.role in('dispatcher','dispatcher_admin') limit 1;
+ if dispatcher_id is null then raise exception 'No dispatcher or dispatcher-admin account was found for that email.'; end if;
+ if not exists(select 1 from public.carrier_profiles c where c.user_id=target_carrier_user_id) then raise exception 'The selected carrier profile does not exist.'; end if;
+ insert into public.dispatcher_carrier_assignments(dispatcher_user_id,carrier_user_id,assigned_by)
+ values(dispatcher_id,target_carrier_user_id,(select auth.uid()))
+ on conflict(dispatcher_user_id,carrier_user_id) do update set assigned_by=(select auth.uid())
+ returning id into assignment_id;
+ return assignment_id;
+end;
+$$;
+revoke all on function private.assign_dispatcher_to_carrier(text,uuid) from public,anon;
+grant execute on function private.assign_dispatcher_to_carrier(text,uuid) to authenticated;
+
+create or replace function private.list_dispatcher_carrier_assignments()
+returns table(assignment_id uuid,dispatcher_email text,dispatcher_user_id uuid,carrier_user_id uuid,business_name text,mc_number text,dot_number text)
+language plpgsql stable security definer set search_path=''
+as $$
+begin
+ if not public.is_portal_admin() then raise exception 'Only the platform administrator can list all dispatcher assignments.'; end if;
+ return query select a.id,u.email::text,a.dispatcher_user_id,a.carrier_user_id,
+  coalesce(c.business_name,c.company_name),c.mc_number,c.dot_number
+ from public.dispatcher_carrier_assignments a join auth.users u on u.id=a.dispatcher_user_id
+ join public.carrier_profiles c on c.user_id=a.carrier_user_id
+ order by lower(coalesce(u.email,'')),lower(coalesce(c.business_name,c.company_name,''));
+end;
+$$;
+revoke all on function private.list_dispatcher_carrier_assignments() from public,anon;
+grant execute on function private.list_dispatcher_carrier_assignments() to authenticated;
+
+create or replace function private.remove_dispatcher_carrier_assignment(target_assignment_id uuid)
+returns void language plpgsql security definer set search_path=''
+as $$
+begin
+ if not public.is_portal_admin() then raise exception 'Only the platform administrator can remove dispatcher assignments.'; end if;
+ delete from public.dispatcher_carrier_assignments where id=target_assignment_id;
+end;
+$$;
+revoke all on function private.remove_dispatcher_carrier_assignment(uuid) from public,anon;
+grant execute on function private.remove_dispatcher_carrier_assignment(uuid) to authenticated;
+
+create or replace function public.assign_dispatcher_to_carrier(dispatcher_email text,target_carrier_user_id uuid)
+returns uuid language sql security invoker set search_path=''
+as $$ select private.assign_dispatcher_to_carrier(dispatcher_email,target_carrier_user_id); $$;
+revoke all on function public.assign_dispatcher_to_carrier(text,uuid) from public,anon;
+grant execute on function public.assign_dispatcher_to_carrier(text,uuid) to authenticated;
+
+create or replace function public.list_dispatcher_carrier_assignments()
+returns table(assignment_id uuid,dispatcher_email text,dispatcher_user_id uuid,carrier_user_id uuid,business_name text,mc_number text,dot_number text)
+language sql security invoker set search_path=''
+as $$ select * from private.list_dispatcher_carrier_assignments(); $$;
+revoke all on function public.list_dispatcher_carrier_assignments() from public,anon;
+grant execute on function public.list_dispatcher_carrier_assignments() to authenticated;
+
+create or replace function public.remove_dispatcher_carrier_assignment(target_assignment_id uuid)
+returns void language sql security invoker set search_path=''
+as $$ select private.remove_dispatcher_carrier_assignment(target_assignment_id); $$;
+revoke all on function public.remove_dispatcher_carrier_assignment(uuid) from public,anon;
+grant execute on function public.remove_dispatcher_carrier_assignment(uuid) to authenticated;
