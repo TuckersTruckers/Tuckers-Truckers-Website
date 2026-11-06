@@ -165,6 +165,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
       for(const name of ['reefer_temp_min_f','reefer_temp_max_f']){const wrap=refs[name]?.closest('.fleet-field');if(wrap)wrap.hidden=category!=='reefer';}
     };
     refs.equipment_category.addEventListener('change',toggleTypeFields);toggleTypeFields();
+    if(refs.total_length_feet)refs.total_length_feet.placeholder=(currentCategory==='box_truck'?'e.g. 26':'e.g. 53');
     const cancel=el('button','button','Cancel');cancel.type='button';cancel.addEventListener('click',()=>c.remove());form.querySelector('.fleet-actions').append(cancel);
     return c;
   };
@@ -208,7 +209,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
       eform.append(tractorForm,trailerForm);
     }else if(category==='power_only'){
       eform.append(equipmentForm('tractor',null,'power_only'));
-    }else if(category==='box_truck'||category==='hot_shot'||category==='cargo_van'){
+    }else if(category==='box_truck'||category==='cargo_van'){
       eform.append(equipmentForm('tractor',null,category));
     }else{
       eform.append(el('h3','',categoryLabels[category]||category.replaceAll('_',' ')));
