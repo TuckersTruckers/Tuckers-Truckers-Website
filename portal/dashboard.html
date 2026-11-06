@@ -490,13 +490,34 @@ $('carrier-document-form')?.addEventListener('submit',async event=>{
  if(recordError){await supabase.storage.from('carrier-documents').remove([path]);return notice('The document record could not be saved: '+recordError.message,'error')}
  $('carrier-document-file').value='';notice('Company document uploaded successfully.','success');await loadCarrierDocuments();
 });
-function addModulePanels(){
+function addModulePanels(){ 
+ $('carrier-company-logo-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const file=$('carrier-company-logo-file').files[0];
+  if(!file)return notice('Choose a PNG or JPG company logo first.','error');
+  if(!['image/png','image/jpeg'].includes(file.type)||file.size>5*1024*1024)return notice('Use a PNG or JPG image no larger than 5 MB.','error');
+  const button=$('carrier-company-logo-form').querySelector('button[type="submit"]');button.disabled=true;button.textContent='Uploading…';
+  const oldPath=await loadCarrierBrandLogo(user.id),path=user.id+'/company-logo/'+crypto.randomUUID()+(file.type==='image/png'?'.png':'.jpg');
+  const {error:uploadError}=await supabase.storage.from('carrier-documents').upload(path,file,{contentType:file.type,upsert:false});
+  if(uploadError){notice('Company logo upload failed: '+uploadError.message,'error');button.disabled=false;button.textContent='Upload logo';return}
+  const {error:saveError}=await supabase.from('carrier_branding').upsert({user_id:user.id,logo_path:path,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+  if(saveError){await supabase.storage.from('carrier-documents').remove([path]);notice('The logo could not be saved: '+saveError.message,'error');button.disabled=false;button.textContent='Upload logo';return}
+  if(oldPath&&oldPath!==path)await supabase.storage.from('carrier-documents').remove([oldPath]);
+  $('carrier-company-logo-file').value='';await loadCarrierBrandLogo(user.id);notice('Company logo uploaded and added to your Dashboard Hero Banner.','success');button.disabled=false;button.textContent='Upload logo';
+ });
+ $('carrier-company-logo-remove')?.addEventListener('click',async()=>{
+  if(!confirm('Remove your company logo from the Dashboard Hero Banner?'))return;
+  const oldPath=await loadCarrierBrandLogo(user.id);if(!oldPath)return;
+  const {error}=await supabase.from('carrier_branding').update({logo_path:null,updated_at:new Date().toISOString()}).eq('user_id',user.id);
+  if(error){notice('Could not remove company logo: '+error.message,'error');return}
+  await supabase.storage.from('carrier-documents').remove([oldPath]);await loadCarrierBrandLogo(user.id);notice('Company logo removed. The original Hero Banner photo is restored.','success');
+ });
+
  const main=document.querySelector('.shell');
  for(const [id,title,description] of moduleSpecs){
   if($(id+'-panel'))continue;
   const section=document.createElement('section');section.id=id+'-panel';section.hidden=true;
   if(id==='company'){
-   section.innerHTML='<div class="section-title"><div><h2>Company Profile</h2><p>Confirmed company and primary account-holder information. Contact Tucker’s Truckers if any approved details need to change.</p></div></div><div class="card"><div id="carrier-company-profile" class="profile-summary-grid"><div class="empty">Loading company information…</div></div></div>';
+   section.innerHTML='<div class="section-title"><div><h2>Company Profile</h2><p>Confirmed company and primary account-holder information. Contact Tucker’s Truckers if any approved details need to change.</p></div></div><div class="card"><h2>Company Logo</h2><p>Upload your company logo to personalize the Hero Banner on your Dashboard. PNG or JPG, maximum 5 MB.</p><div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0"><img id="carrier-company-logo-preview" alt="Current company logo" hidden style="width:170px;height:90px;object-fit:contain;background:#202020;border:1px solid var(--line);border-radius:9px;padding:8px"><span id="carrier-company-logo-empty" class="empty">No company logo uploaded.</span></div><form id="carrier-company-logo-form"><div class="grid" style="grid-template-columns:minmax(0,1fr) auto;align-items:end"><div><label for="carrier-company-logo-file">Company Logo file</label><input id="carrier-company-logo-file" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg"></div><div class="carrier-actions"><button class="button primary" type="submit">Upload logo</button><button class="button" id="carrier-company-logo-remove" type="button" hidden>Remove logo</button></div></div></form><p id="carrier-company-logo-status" role="status" style="margin:10px 0 0"></p></div><div class="card"><div id="carrier-company-profile" class="profile-summary-grid"><div class="empty">Loading company information…</div></div></div>';
   }else if(id==='company-documents'){
    section.innerHTML='<div class="section-title"><div><h2>Company Documents</h2><p>View and securely upload the documents associated with your carrier account.</p></div></div><div class="card"><h2>Upload a company document</h2><p>PDF, JPG, or PNG files up to 50 MB. Documents are stored privately with your carrier account.</p><form id="carrier-document-form"><div class="grid"><div><label for="carrier-document-type">Document type</label><select id="carrier-document-type" required><option value="insurance">Certificate of Insurance (COI)</option><option value="w9">W-9</option><option value="operating_authority">Operating Authority</option><option value="noa">Notice of Assignment (NOA)</option><option value="cab_card">Cab Card</option><option value="additional_certificate">Additional Certificate</option><option value="other">Other</option></select></div><div><label for="carrier-document-file">Choose file</label><input id="carrier-document-file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required></div></div><div style="margin-top:14px"><button class="button primary" type="submit">Upload document</button></div></form></div><div class="card module-workspace"><h2>Saved company documents</h2><div id="carrier-document-list" class="carrier-list"><div class="empty">Loading documents…</div></div></div>';
   }else if(id==='equipment'){
@@ -553,17 +574,17 @@ function activateTab(id){const ids=['overview','carriers','drivers','loads','quo
 function row(title,detail,badge,action,actionText){const el=document.createElement('article');el.className='carrier-row';const info=document.createElement('div');const h=document.createElement('h3');h.textContent=title;const p=document.createElement('p');p.textContent=detail;info.append(h,p);if(badge){const b=document.createElement('span');b.className='tag';b.textContent=badge;info.append(b)}el.append(info);if(action){const actions=document.createElement('div');actions.className='carrier-actions';const a=document.createElement('a');a.className='button';a.href=action;a.textContent=actionText||'Open';actions.append(a);el.append(actions)}return el}
 
 async function loadCarrierBrandLogo(carrierUserId){
- const hero=document.querySelector('.hero'),img=$('carrier-brand-logo');
- if(!hero||!img)return;
- hero.classList.remove('has-carrier-logo');img.hidden=true;img.removeAttribute('src');
+ const hero=document.querySelector('.hero'),img=$('carrier-brand-logo'),preview=$('carrier-company-logo-preview'),empty=$('carrier-company-logo-empty'),remove=$('carrier-company-logo-remove');
+ if(hero&&img){hero.classList.remove('has-carrier-logo');img.hidden=true;img.removeAttribute('src')}
+ if(preview){preview.hidden=true;preview.removeAttribute('src');if(empty)empty.hidden=false;if(remove)remove.hidden=true}
  const {data:branding,error}=await supabase.from('carrier_branding').select('logo_path').eq('user_id',carrierUserId).maybeSingle();
- if(error){notice('Company logo could not be loaded. '+error.message,'error');return}
- if(!branding?.logo_path)return;
+ if(error){notice('Company logo could not be loaded. '+error.message,'error');return null}
+ if(!branding?.logo_path)return null;
  const {data:link,error:linkError}=await supabase.storage.from('carrier-documents').createSignedUrl(branding.logo_path,3600);
- if(linkError){notice('Company logo could not be opened. '+linkError.message,'error');return}
- img.onerror=()=>{img.hidden=true;hero.classList.remove('has-carrier-logo')};
- img.onload=()=>{img.hidden=false;hero.classList.add('has-carrier-logo')};
- img.src=link.signedUrl;
+ if(linkError){notice('Company logo could not be opened. '+linkError.message,'error');return null}
+ if(hero&&img){img.onerror=()=>{img.hidden=true;hero.classList.remove('has-carrier-logo')};img.onload=()=>{img.hidden=false;hero.classList.add('has-carrier-logo')};img.src=link.signedUrl}
+ if(preview){preview.src=link.signedUrl;preview.hidden=false;if(empty)empty.hidden=true;if(remove)remove.hidden=false}
+ return branding.logo_path;
 }
 
 async function init(){
