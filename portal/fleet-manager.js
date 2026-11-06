@@ -138,6 +138,13 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
         {label:'Front axle (lbs)',name:'front_axle_lbs',type:'number',value:record?.front_axle_lbs||''},
         {label:'Rear tandems (lbs)',name:'rear_tandem_lbs',type:'number',value:record?.rear_tandem_lbs||''}
       ]),
+      ...(!isTrailer?[
+        {label:'Total cargo-body length (ft)',name:'total_length_feet',type:'number',value:record?.total_length_feet||''},
+        {label:'Door width clearance (in)',name:'door_width_inches',type:'number',value:record?.door_width_inches||''},
+        {label:'Door height clearance (in)',name:'door_height_inches',type:'number',value:record?.door_height_inches||''},
+        {label:'Floor type',name:'floor_type',options:[['wood','Wood'],['aluminum','Aluminum'],['other','Other']],value:record?.floor_type||''},
+        {label:'Door style',name:'door_type',options:[['swing','Swing doors'],['roll_up','Roll-up']],value:record?.door_type||''}
+      ]:[]),
       {label:'Has liftgate',name:'has_liftgate',type:'checkbox',value:record?.has_liftgate||false},
       {label:'Notes',name:'notes',value:record?.notes||'',full:true}
     ];
@@ -171,7 +178,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   const equipmentCard = e => {
     const c=el('details','fleet-record');const summary=el('summary');summary.append(el('strong','',(e.unit_number?'Unit '+e.unit_number+' · ':'')+[e.year,e.make,e.model].filter(Boolean).join(' ')||categoryLabels[e.equipment_category]||e.equipment_category),el('span','fleet-record-meta',(e.equipment_kind==='tractor'?'Semi Truck / Power Unit':'Trailer')+' · '+(categoryLabels[e.equipment_category]||e.equipment_category.replaceAll('_',' '))+' · VIN '+(e.vin||'—')));c.append(summary);
     const body=el('div','fleet-record-body');const info=el('div','fleet-info-grid');
-    [['License plate',[e.license_plate,e.license_plate_state].filter(Boolean).join(' / ')],['GVWR',e.gvwr_lbs?e.gvwr_lbs+' lbs':'—'],['Front axle',e.front_axle_lbs?e.front_axle_lbs+' lbs':'—'],['Rear tandems',e.rear_tandem_lbs?e.rear_tandem_lbs+' lbs':'—'],['Total length',e.total_length_feet?e.total_length_feet+' ft':'—'],['Door clearance',[e.door_width_inches,e.door_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—'],['Floor type',e.floor_type||'—'],['Door style',e.door_type==='roll_up'?'Roll-up':e.door_type==='swing'?'Swing doors':'—'].forEach(([k,v])=>{const x=el('div');x.append(el('small','',k),el('strong','',v));info.append(x)});body.append(info);
+    [['License plate',[e.license_plate,e.license_plate_state].filter(Boolean).join(' / ')],['GVWR',e.gvwr_lbs?e.gvwr_lbs+' lbs':'—'],['Front axle',e.front_axle_lbs?e.front_axle_lbs+' lbs':'—'],['Rear tandems',e.rear_tandem_lbs?e.rear_tandem_lbs+' lbs':'—'],['Total length',e.total_length_feet?e.total_length_feet+' ft':'—'],['Door clearance',[e.door_width_inches,e.door_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—'],['Floor type',e.floor_type||'—'],['Door style',e.door_type==='roll_up'?'Roll-up':e.door_type==='swing'?'Swing doors':'—']].forEach(([k,v])=>{const x=el('div');x.append(el('small','',k),el('strong','',v));info.append(x)});body.append(info);
     const edit=el('button','button','Edit equipment');edit.type='button';edit.addEventListener('click',()=>body.prepend(equipmentForm(e.equipment_kind,e)));body.append(edit);
     const docsBox=el('div');body.append(docsBox);const loadDocs=async()=>{const {data,error}=await supabase.from('carrier_equipment_documents').select('*').eq('carrier_user_id',carrierUserId).eq('equipment_id',e.id).order('uploaded_at',{ascending:false});if(error){say(error.message,true);return}docsBox.replaceChildren(docSection('equipment',e.id,data,loadDocs))};loadDocs();c.append(body);return c;
   };
