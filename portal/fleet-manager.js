@@ -127,13 +127,6 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
         {label:'Minimum reefer temp (°F)',name:'reefer_temp_min_f',type:'number',value:record?.reefer_temp_min_f||''},
         {label:'Maximum reefer temp (°F)',name:'reefer_temp_max_f',type:'number',value:record?.reefer_temp_max_f||''}
       ]:[]),
-      ...(currentCategory==='box_truck'||record?.equipment_category==='box_truck'?[
-        {label:'Total cargo-body length (ft)',name:'total_length_feet',type:'number',value:record?.total_length_feet||''},
-        {label:'Door width clearance (in)',name:'door_width_inches',type:'number',value:record?.door_width_inches||''},
-        {label:'Door height clearance (in)',name:'door_height_inches',type:'number',value:record?.door_height_inches||''},
-        {label:'Floor type',name:'floor_type',options:[['wood','Wood'],['aluminum','Aluminum'],['other','Other']],value:record?.floor_type||''},
-        {label:'Door style',name:'door_type',options:[['swing','Swing doors'],['roll_up','Roll-up']],value:record?.door_type||''}
-      ]:[]),
       ...(isTrailer?[]:[
         {label:'Front axle (lbs)',name:'front_axle_lbs',type:'number',value:record?.front_axle_lbs||''},
         {label:'Rear tandems (lbs)',name:'rear_tandem_lbs',type:'number',value:record?.rear_tandem_lbs||''}
