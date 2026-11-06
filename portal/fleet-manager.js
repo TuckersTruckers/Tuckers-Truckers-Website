@@ -102,10 +102,11 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   const dlist=el('div','fleet-record-list');dlist.dataset.driverList='';driverRoot.append(dlist);
   const categoryLabels={tractor:'Semi Truck / Power Unit',power_only:'Power Only',flat_step_deck:'Flat Step Deck',flat_conestoga:'Flat Conestoga',straight_truck:'Box Truck',box_truck:'Box Truck',cargo_van:'Cargo Van / Sprinter Van',hot_shot:'Hot Shot',dry_van:'Dry Van',flatbed:'Flatbed',reefer:'Reefer',auto_carrier:'Auto Carrier',b_train:'B-Train',conestoga:'Conestoga',container:'Container',container_insulated:'Container Insulated',container_refrigerated:'Container Refrigerated',conveyor:'Conveyor',double_drop:'Double Drop',dump_trailer:'Dump Trailer',flatbed_air_ride:'Flatbed Air Ride',flatbed_conestoga:'Flatbed Conestoga',flatbed_double:'Flatbed Double',flatbed_hotshot:'Flatbed Hotshot',flatbed_maxi:'Flatbed Maxi',flatbed_overdimension:'Flatbed Overdimension',flatbed_with_chains:'Flatbed with Chains',flatbed_with_sides:'Flatbed with Sides',flatbed_with_tarps:'Flatbed with Tarps',hopper_bottom:'Hopper Bottom',insulated_van:'Insulated Van',lowboy:'Lowboy',moving_van:'Moving Van',other:'Other',pneumatic:'Pneumatic',reefer_air_ride:'Reefer Air Ride',reefer_double:'Reefer Double',reefer_hazmat:'Reefer Hazmat',reefer_intermodal:'Reefer Intermodal',reefer_logistics:'Reefer Logistics',reefer_pallet_exchange:'Reefer with Pallet Exchange',rgn:'Removable Gooseneck (RGN)',step_deck:'Step Deck',step_deck_conestoga:'Step Deck Conestoga',stretch_trailer:'Stretch Trailer',tanker:'Tanker',tanker_aluminum:'Tanker Aluminum',tanker_intermodal:'Tanker Intermodal',tanker_steel:'Tanker Steel',van_air_ride:'Van Air Ride',van_conestoga:'Van Conestoga',van_double:'Van Double',van_hazmat:'Van Hazmat',van_hotshot:'Van Hotshot',van_insulated:'Van Insulated',van_intermodal:'Van Intermodal',van_lift_gate:'Van Lift Gate',van_open_top:'Van Open Top',van_roller_bed:'Van Roller Bed',van_triple:'Van Triple',van_vented:'Van Vented',van_blanket_wrap:'Van with Blanket Wrap',van_curtains:'Van with Curtains',van_pallet_exchange:'Van with Pallet Exchange',box:'Box (legacy)'};
   const primaryTypes=[['dry_van','Dry Van'],['flatbed','Flatbed'],['reefer','Reefer'],['power_only','Power Only']];
-  const allOtherTypes=Object.entries(categoryLabels).filter(([value])=>!['tractor','power_only','dry_van','flatbed','reefer'].includes(value)).map(([value,label])=>[value,label]).sort((a,b)=>a[1].localeCompare(b[1]));
+  const allOtherTypes=Object.entries(categoryLabels).filter(([value])=>!['tractor','power_only','dry_van','flatbed','reefer','straight_truck','box'].includes(value)).map(([value,label])=>[value,label]).sort((a,b)=>a[1].localeCompare(b[1]));
   const categoryMode=category=>['box_truck','straight_truck','box','cargo_van'].includes(category)?'vehicle':category==='power_only'?'power_only':'combination';
   const isVanStyle=category=>category==='dry_van'||category==='reefer'||category==='insulated_van'||category==='moving_van'||category.startsWith('van_');
-  const isEnclosed=category=>isVanStyle(category)||['box_truck','straight_truck','box','cargo_van'].includes(category);
+  const isEnclosed=category=>['dry_van','reefer','box_truck','straight_truck','box'].includes(category);
+  const needsDoorType=category=>isVanStyle(category)||['box_truck','straight_truck','box'].includes(category);
   const equipmentTypeOptions=()=>[
     ...primaryTypes,
     ...allOtherTypes
@@ -150,7 +151,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
       {label:'Door height clearance (in)',name:'trailer_door_height_inches',type:'number',value:record.door_height_inches||''}
     ]:[]),
     ...(['dry_van','box_truck','straight_truck','box'].includes(category)?[{label:'Floor type',name:'trailer_floor_type',options:[['wood','Wood'],['aluminum','Aluminum'],['other','Other']],value:record.floor_type||''}]:[]),
-    ...(isVanStyle(category)?[{label:'Door type',name:'trailer_door_type',options:[['swing','Swing'],['roll_up','Roll-up']],value:record.door_type||''}]:[]),
+    ...(needsDoorType(category)?[{label:'Door type',name:'trailer_door_type',options:[['swing','Swing'],['roll_up','Roll-up']],value:record.door_type||''}]:[]),
     ...(category==='reefer'?[{label:'Minimum reefer temperature (°F)',name:'trailer_reefer_temp_min_f',type:'number',value:record.reefer_temp_min_f||''},{label:'Maximum reefer temperature (°F)',name:'trailer_reefer_temp_max_f',type:'number',value:record.reefer_temp_max_f||''}]:[]),
     {label:'Has liftgate',name:'trailer_has_liftgate',type:'checkbox',value:record.has_liftgate||false},
     {label:'Notes',name:'trailer_notes',value:record.notes||'',full:true}
@@ -163,7 +164,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
       {label:'Door height clearance (in)',name:'tractor_door_height_inches',type:'number',value:record.door_height_inches||''}
     ]:[]),
     ...(['box_truck','straight_truck','box'].includes(category)?[{label:'Floor type',name:'tractor_floor_type',options:[['wood','Wood'],['aluminum','Aluminum'],['other','Other']],value:record.floor_type||''}]:[]),
-    ...(isVanStyle(category)?[{label:'Door type',name:'tractor_door_type',options:[['swing','Swing'],['roll_up','Roll-up']],value:record.door_type||''}]:[]),
+    ...(needsDoorType(category)?[{label:'Door type',name:'tractor_door_type',options:[['swing','Swing'],['roll_up','Roll-up']],value:record.door_type||''}]:[]),
     {label:'Has liftgate',name:'tractor_has_liftgate',type:'checkbox',value:record.has_liftgate||false},
     {label:'Notes',name:'tractor_notes',value:record.notes||'',full:true}
   ];
