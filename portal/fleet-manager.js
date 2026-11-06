@@ -1,4 +1,4 @@
-export async function initFleetManager({ supabase, carrierUserId, driverRoot, equipmentRoot }) {
+export async function initFleetManager({ supabase, carrierUserId, driverRoot, equipmentRoot, onEquipmentChange = () => {} }) {
   if (!supabase || !carrierUserId || !driverRoot || !equipmentRoot) return;
   const el = (tag, cls, text) => { const n=document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; };
   const safe = value => value == null ? '' : String(value);
@@ -102,7 +102,14 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   const equipmentForm = (kind, record=null) => {
     const isTrailer=kind==='trailer';
     const defs=[
-      {label:'Equipment category',name:'equipment_category',options:(isTrailer?[['dry_van','Dry Van'],['reefer','Reefer'],['flatbed','Flatbed / Open Deck'],['step_deck','Step Deck'],['conestoga','Conestoga'],['box','Box'],['tanker','Tanker'],['other','Other']]:[['tractor','Tractor'],['straight_truck','Straight Truck'],['box_truck','Box Truck'],['hot_shot','Hot Shot'],['other','Other']]),value:record?.equipment_category||''},
+      {label:'Equipment category',name:'equipment_category',options:(isTrailer?[
+        ['dry_van','Dry Van'],['flatbed','Flatbed'],['reefer','Reefer'],
+        ['auto_carrier','Auto Carrier'],['b_train','B-Train'],['conestoga','Conestoga'],['container','Container'],['container_insulated','Container Insulated'],['container_refrigerated','Container Refrigerated'],['conveyor','Conveyor'],['double_drop','Double Drop'],['dump_trailer','Dump Trailer'],['flatbed_air_ride','Flatbed Air Ride'],['flatbed_conestoga','Flatbed Conestoga'],['flatbed_double','Flatbed Double'],['flatbed_hotshot','Flatbed Hotshot'],['flatbed_maxi','Flatbed Maxi'],['flatbed_overdimension','Flatbed Overdimension'],['flatbed_with_chains','Flatbed with Chains'],['flatbed_with_sides','Flatbed with Sides'],['flatbed_with_tarps','Flatbed with Tarps'],['hopper_bottom','Hopper Bottom'],['insulated_van','Insulated Van'],['lowboy','Lowboy'],['moving_van','Moving Van'],['pneumatic','Pneumatic'],['reefer_air_ride','Reefer Air Ride'],['reefer_double','Reefer Double'],['reefer_hazmat','Reefer Hazmat'],['reefer_intermodal','Reefer Intermodal'],['reefer_logistics','Reefer Logistics'],['reefer_pallet_exchange','Reefer with Pallet Exchange'],['rgn','Removable Gooseneck (RGN)'],['step_deck','Step Deck'],['step_deck_conestoga','Step Deck Conestoga'],['stretch_trailer','Stretch Trailer'],['tanker','Tanker'],['tanker_aluminum','Tanker Aluminum'],['tanker_intermodal','Tanker Intermodal'],['tanker_steel','Tanker Steel'],['van_air_ride','Van Air Ride'],['van_conestoga','Van Conestoga'],['van_double','Van Double'],['van_hazmat','Van Hazmat'],['van_hotshot','Van Hotshot'],['van_insulated','Van Insulated'],['van_intermodal','Van Intermodal'],['van_lift_gate','Van Lift Gate'],['van_open_top','Van Open Top'],['van_roller_bed','Van Roller Bed'],['van_triple','Van Triple'],['van_vented','Van Vented'],['van_blanket_wrap','Van with Blanket Wrap'],['van_curtains','Van with Curtains'],['van_pallet_exchange','Van with Pallet Exchange'],['other','Other'],
+        ...(record?.equipment_category==='box'?[['box','Box (legacy)']]:[])
+      ]:[
+        ['tractor','Semi Truck / Power Unit'],['box_truck','Box Truck (Straight Truck)'],['cargo_van','Cargo Van / Sprinter Van'],['hot_shot','Hot Shot'],['other','Other'],
+        ...(record?.equipment_category==='straight_truck'?[['straight_truck','Box Truck (legacy record)']]:[])
+      ]),value:record?.equipment_category||''},
       {label:'Unit number',name:'unit_number',value:record?.unit_number||''},{label:'Year',name:'year',type:'number',value:record?.year||''},
       {label:'Make',name:'make',value:record?.make||''},{label:'Model',name:'model',value:record?.model||''},{label:'VIN',name:'vin',value:record?.vin||''},
       {label:'License plate',name:'license_plate',value:record?.license_plate||''},{label:'Plate state',name:'license_plate_state',value:record?.license_plate_state||''},
@@ -131,7 +138,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
     return c;
   };
   const equipmentCard = e => {
-    const c=el('details','fleet-record');const summary=el('summary');summary.append(el('strong','',(e.unit_number?'Unit '+e.unit_number+' · ':'')+[e.year,e.make,e.model].filter(Boolean).join(' ')||e.equipment_category),el('span','fleet-record-meta',(e.equipment_kind==='tractor'?'Tractor':'Trailer')+' · '+e.equipment_category.replaceAll('_',' ')+' · VIN '+(e.vin||'—')));c.append(summary);
+    const c=el('details','fleet-record');const summary=el('summary');summary.append(el('strong','',(e.unit_number?'Unit '+e.unit_number+' · ':'')+[e.year,e.make,e.model].filter(Boolean).join(' ')||e.equipment_category),el('span','fleet-record-meta',(e.equipment_kind==='tractor'?'Semi Truck / Power Unit':'Trailer')+' · '+e.equipment_category.replaceAll('_',' ')+' · VIN '+(e.vin||'—')));c.append(summary);
     const body=el('div','fleet-record-body');const info=el('div','fleet-info-grid');
     [['License plate',[e.license_plate,e.license_plate_state].filter(Boolean).join(' / ')],['GVWR',e.gvwr_lbs?e.gvwr_lbs+' lbs':'—'],['Front axle',e.front_axle_lbs?e.front_axle_lbs+' lbs':'—'],['Rear tandems',e.rear_tandem_lbs?e.rear_tandem_lbs+' lbs':'—'],['Overall dimensions',[e.overall_length_inches,e.overall_width_inches,e.overall_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—'],['Interior dimensions',[e.interior_length_inches,e.interior_width_inches,e.interior_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—'],['Door clearance',[e.door_width_inches,e.door_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—']].forEach(([k,v])=>{const x=el('div');x.append(el('small','',k),el('strong','',v));info.append(x)});body.append(info);
     const edit=el('button','button','Edit equipment');edit.type='button';edit.addEventListener('click',()=>body.prepend(equipmentForm(e.equipment_kind,e)));body.append(edit);
@@ -140,9 +147,10 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   const renderEquipment = async () => {
     const list=equipmentRoot.querySelector('[data-equipment-list]');list.replaceChildren();
     const data=await loadEquipment();const tractors=data.filter(x=>x.equipment_kind==='tractor'),trailers=data.filter(x=>x.equipment_kind==='trailer');
-    for(const [title,items] of [['Tractors',tractors],['Trailers',trailers]]){const group=el('section','fleet-group');group.append(el('h3','',title));if(!items.length)group.append(el('p','muted','No '+title.toLowerCase()+' saved yet.'));items.forEach(x=>group.append(equipmentCard(x)));list.append(group)}
+    for(const [title,items] of [['Semi Trucks / Power Units',tractors],['Trailers',trailers]]){const group=el('section','fleet-group');group.append(el('h3','',title));if(!items.length)group.append(el('p','muted','No '+title.toLowerCase()+' saved yet.'));items.forEach(x=>group.append(equipmentCard(x)));list.append(group)}
     await renderProfiles(data);
     await refreshProfileOptions();
+    onEquipmentChange(tractors.length);
   };
   const renderProfiles = async equipment => {
     const box=equipmentRoot.querySelector('[data-profile-list]');box.replaceChildren();
@@ -152,7 +160,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
     profiles.forEach(p=>{const line=el('article','fleet-record');line.append(el('strong','',p.profile_name),el('p','fleet-record-meta',(p.tractor?.unit_number||p.tractor?.make||'Tractor')+' + '+(p.is_power_only?'Power only':p.trailer?.unit_number||p.trailer?.make||'Trailer')+' · '+((p.carrier_truck_profile_drivers||[]).map(x=>x.carrier_drivers?.display_name).filter(Boolean).join(', ')||'No drivers assigned')));box.append(line)});
   };
   equipmentRoot.replaceChildren();
-  const ehead=el('div','fleet-section-head');ehead.append(el('div','', 'Equipment inventory'),el('p','muted','Save tractors and trailers independently. Add photos, VIN images, plates, and equipment documents to each record.'));const addT=el('button','button primary','Add tractor');addT.type='button';const addR=el('button','button','Add trailer');addR.type='button';ehead.append(addT,addR);equipmentRoot.append(ehead,status);
+  const ehead=el('div','fleet-section-head');ehead.append(el('div','', 'Equipment inventory'),el('p','muted','Save tractors and trailers independently. Add photos, VIN images, plates, and equipment documents to each record.'));const addT=el('button','button primary','Add Semi Truck / Power Unit');addT.type='button';const addR=el('button','button','Add trailer');addR.type='button';ehead.append(addT,addR);equipmentRoot.append(ehead,status);
   const eform=el('div');equipmentRoot.append(eform);addT.addEventListener('click',()=>eform.replaceChildren(equipmentForm('tractor')));addR.addEventListener('click',()=>eform.replaceChildren(equipmentForm('trailer')));
   const list=el('div');list.dataset.equipmentList='';equipmentRoot.append(list);
   const profiles=card('Saved truck profiles','Pair one tractor with an optional trailer, then assign one or more drivers. A tractor can appear in multiple saved profiles.');
