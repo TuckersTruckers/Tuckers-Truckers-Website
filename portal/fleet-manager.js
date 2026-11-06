@@ -41,7 +41,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   const docSection = (kind, recordId, docs, reload) => {
     const wrap=el('div','fleet-docs');
     const form=el('form','fleet-upload');
-    const type=el('select'); const choices=kind==='drivers'?[['cdl','CDL'],['medical_card','Medical card'],['driver_photo','Driver photo'],['other','Other']]:[['tractor_side_door','Tractor side door / company identifiers'],['rear_plate','Rear trailer plate'],['exterior_photo','Full exterior photo'],['interior_photo','Trailer interior'],['vin_sticker','VIN sticker'],['registration','Registration'],['cab_card','Cab card'],['insurance','Insurance'],['other','Other']];
+    const type=el('select'); const choices=kind==='drivers'?[['cdl','CDL'],['medical_card','Medical card'],['driver_photo','Driver photo'],['other','Other']]:[['tractor_side_door','Semi truck side door / company identifiers'],['rear_plate','Rear trailer plate'],['exterior_photo','Full exterior photo'],['interior_photo','Trailer interior'],['vin_sticker','VIN sticker'],['registration','Registration'],['cab_card','Cab card'],['insurance','Insurance'],['other','Other']];
     choices.forEach(([v,t])=>type.append(new Option(t,v)));
     const file=el('input');file.type='file';file.accept='.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';file.required=true;
     const expires=el('input');expires.type='date';
@@ -160,7 +160,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
     profiles.forEach(p=>{const line=el('article','fleet-record');line.append(el('strong','',p.profile_name),el('p','fleet-record-meta',(p.tractor?.unit_number||p.tractor?.make||'Semi Truck / Power Unit')+' + '+(p.is_power_only?'Power only':p.trailer?.unit_number||p.trailer?.make||'Trailer')+' · '+((p.carrier_truck_profile_drivers||[]).map(x=>x.carrier_drivers?.display_name).filter(Boolean).join(', ')||'No drivers assigned')));box.append(line)});
   };
   equipmentRoot.replaceChildren();
-  const ehead=el('div','fleet-section-head');ehead.append(el('div','', 'Equipment inventory'),el('p','muted','Save tractors and trailers independently. Add photos, VIN images, plates, and equipment documents to each record.'));const addT=el('button','button primary','Add Semi Truck / Power Unit');addT.type='button';const addR=el('button','button','Add trailer');addR.type='button';ehead.append(addT,addR);equipmentRoot.append(ehead,status);
+  const ehead=el('div','fleet-section-head');ehead.append(el('div','', 'Equipment inventory'),el('p','muted','Save power units and trailers independently. Add photos, VIN images, plates, and equipment documents to each record.'));const addT=el('button','button primary','Add Semi Truck / Power Unit');addT.type='button';const addR=el('button','button','Add trailer');addR.type='button';ehead.append(addT,addR);equipmentRoot.append(ehead,status);
   const eform=el('div');equipmentRoot.append(eform);addT.addEventListener('click',()=>eform.replaceChildren(equipmentForm('tractor')));addR.addEventListener('click',()=>eform.replaceChildren(equipmentForm('trailer')));
   const list=el('div');list.dataset.equipmentList='';equipmentRoot.append(list);
   const profiles=card('Saved truck profiles','Pair one Semi Truck / Power Unit with an optional trailer, then assign one or more drivers. A power unit can appear in multiple saved profiles.');
