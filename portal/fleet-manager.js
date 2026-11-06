@@ -116,10 +116,10 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
     const grid=el('div','fleet-form-grid');
     for(const d of definitions){
       const holder=el('div');
-      const input=field(holder,d.label,d.name,d.type||'text',d.options,initial?.[d.name]??'');
+      const fieldValue=initial?.[d.name]??d.value??'';const input=field(holder,d.label,d.name,d.type||'text',d.options,fieldValue);
       const wrap=input.parentElement;
       if(d.full)wrap.classList.add('fleet-full');
-      if(d.type==='checkbox')input.checked=Boolean(initial?.[d.name]);
+      if(d.type==='checkbox')input.checked=Boolean(initial?.[d.name]??d.value);
       if(d.placeholder)input.placeholder=d.placeholder;
       refs[d.name]=input;
       grid.append(wrap);
@@ -215,7 +215,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
     const c=card(editing?'Edit equipment profile':'Add equipment','Choose one equipment type, complete the applicable details, and save the profile once.');
     const form=el('form','fleet-form');const refs={};const typeWrap=el('label','fleet-field');typeWrap.append(el('span','', 'Equipment type'));
     const typeSelect=el('select');typeSelect.name='equipment_type';typeSelect.append(new Option('Select equipment type…',''));
-    const primaryGroup=el('optgroup');primaryGroup.label='Primary Equipment';primaryTypes.forEach(([v,t])=>primaryGroup.append(new Option(t,v)));typeSelect.append(primaryGroup);
+    primaryTypes.forEach(([v,t])=>typeSelect.append(new Option(t,v)));
     const otherGroup=el('optgroup');otherGroup.label='Other Equipment';allOtherTypes.forEach(([v,t])=>otherGroup.append(new Option(t,v)));typeSelect.append(otherGroup);
     typeSelect.value=category;if(editing)typeSelect.disabled=true;typeWrap.append(typeSelect);form.append(typeWrap);
     const sections=el('div');form.append(sections);
