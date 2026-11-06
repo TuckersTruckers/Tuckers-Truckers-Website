@@ -35,6 +35,32 @@ body{background:#f3f3f3}
 #admin-panel .card{margin-bottom:14px}
 @media(max-width:900px){.carrier-workspace-shell{grid-template-columns:190px minmax(0,1fr)}.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.carrier-workspace-shell{grid-template-columns:1fr}.carrier-workspace-nav{min-height:0;padding:12px}.carrier-nav-list{grid-template-columns:repeat(2,minmax(0,1fr))}.carrier-nav-back{margin-top:0}.summary-grid{grid-template-columns:1fr}.workspace-heading{flex-direction:column}.dashboard-callout{align-items:flex-start;flex-direction:column}}
+
+.fleet-form-section{border:1px solid var(--line);border-radius:10px;padding:15px;margin:14px 0;background:#fff}
+.fleet-form-section h3{margin:0 0 12px;font-size:15px}
+.fleet-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fleet-field{display:block;min-width:0;font-size:12px;font-weight:750}
+.fleet-field>span{display:block;margin-bottom:5px}
+.fleet-field input,.fleet-field select{width:100%;font:inherit;padding:10px;border:1px solid #d6d6d6;border-radius:8px}
+.fleet-full{grid-column:1/-1}
+.fleet-driver-checks{display:flex;flex-wrap:wrap;gap:10px}
+.fleet-driver-checks label{display:flex;align-items:center;gap:6px;font-weight:500}
+.fleet-driver-checks input{width:auto}
+.fleet-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.fleet-group{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+.fleet-group h3{margin:0 0 8px}
+.fleet-record{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0}
+.fleet-record summary{cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.fleet-record-meta{color:var(--muted);font-size:12px}
+.fleet-record-body{padding-top:12px}
+.fleet-info-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.fleet-info-grid>div{padding:9px;background:#f7f7f7;border-radius:8px;min-width:0}
+.fleet-info-grid small{display:block;color:var(--muted);font-size:10px}
+.fleet-info-grid strong{display:block;overflow-wrap:anywhere}
+.fleet-doc-group{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.fleet-doc-group h4{margin:0 0 7px}
+@media(max-width:650px){.fleet-form-grid,.fleet-info-grid{grid-template-columns:1fr}.fleet-full{grid-column:auto}}
+
 </style></head><body>
 <main class="carrier-workspace-shell">
 <aside class="carrier-workspace-nav" aria-label="Carrier workspace navigation">
@@ -66,7 +92,7 @@ body{background:#f3f3f3}
   <div class="dashboard-callout"><div><h2>Company administration</h2><p>Review and update company information, contact details, carrier documents, and account setup from the Administration section.</p></div><button class="btn" type="button" data-open-panel="company-profile">Open Administration</button></div>
  </section>
  <section id="loads-panel" class="workspace-panel" hidden><div id="load-board-root"></div></section>
- <section id="equipment-panel" class="workspace-panel" hidden><div class="workspace-heading"><div><p class="workspace-eyebrow">FLEET MANAGEMENT</p><h1>Equipment</h1><p>Individual trucks and trailers belonging to this carrier.</p></div></div><div id="fleet-equipment-root"></div></section>
+ <section id="equipment-panel" class="workspace-panel" hidden><div class="workspace-heading"><div><p class="workspace-eyebrow">FLEET MANAGEMENT</p><h1>Equipment</h1><p>Saved equipment profiles, including power units and their associated trailers.</p></div></div><div id="fleet-equipment-root"></div></section>
  <section id="drivers-panel" class="workspace-panel" hidden><div class="workspace-heading"><div><p class="workspace-eyebrow">PEOPLE</p><h1>Drivers</h1><p>Driver profiles and supporting documents.</p></div></div><div id="fleet-driver-root"></div></section>
  <section id="finance-panel" class="workspace-panel" hidden><div class="workspace-heading"><div><p class="workspace-eyebrow">FINANCIALS</p><h1>Revenue</h1><p>Weekly, monthly, and yearly company revenue with driver-level summaries.</p></div></div><div class="workspace-placeholder"><h2>Revenue reporting is not connected yet</h2><p>Weekly, monthly, yearly, and driver-level revenue summaries require completed load records and a carrier-scoped reporting data model.</p></div></section>
  <section id="brokers-panel" class="workspace-panel" hidden><div class="workspace-heading"><div><p class="workspace-eyebrow">RELATIONSHIPS</p><h1>Brokers</h1><p>Broker history, performance, and preferred contacts.</p></div></div><div class="workspace-placeholder"><h2>Broker history is not connected yet</h2><p>This section will eventually organize broker activity, load count, revenue, RPM, contacts, and carrier preferences. No broker records are currently stored in this workspace.</p></div></section>
