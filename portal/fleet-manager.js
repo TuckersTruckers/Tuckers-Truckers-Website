@@ -2,7 +2,7 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   if (!supabase || !carrierUserId || !driverRoot || !equipmentRoot) return;
   const el = (tag, cls, text) => { const n=document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; };
   const safe = value => value == null ? '' : String(value);
-  const categoryLabels={tractor:'Semi Truck / Power Unit',straight_truck:'Box Truck (Straight Truck)',box_truck:'Box Truck (Straight Truck)',cargo_van:'Cargo Van / Sprinter Van',hot_shot:'Hot Shot',dry_van:'Dry Van',flatbed:'Flatbed',reefer:'Reefer',auto_carrier:'Auto Carrier',b_train:'B-Train',conestoga:'Conestoga',container:'Container',container_insulated:'Container Insulated',container_refrigerated:'Container Refrigerated',conveyor:'Conveyor',double_drop:'Double Drop',dump_trailer:'Dump Trailer',flatbed_air_ride:'Flatbed Air Ride',flatbed_conestoga:'Flatbed Conestoga',flatbed_double:'Flatbed Double',flatbed_hotshot:'Flatbed Hotshot',flatbed_maxi:'Flatbed Maxi',flatbed_overdimension:'Flatbed Overdimension',flatbed_with_chains:'Flatbed with Chains',flatbed_with_sides:'Flatbed with Sides',flatbed_with_tarps:'Flatbed with Tarps',hopper_bottom:'Hopper Bottom',insulated_van:'Insulated Van',lowboy:'Lowboy',moving_van:'Moving Van',pneumatic:'Pneumatic',reefer_air_ride:'Reefer Air Ride',reefer_double:'Reefer Double',reefer_hazmat:'Reefer Hazmat',reefer_intermodal:'Reefer Intermodal',reefer_logistics:'Reefer Logistics',reefer_pallet_exchange:'Reefer with Pallet Exchange',rgn:'Removable Gooseneck (RGN)',step_deck:'Step Deck',step_deck_conestoga:'Step Deck Conestoga',stretch_trailer:'Stretch Trailer',tanker:'Tanker',tanker_aluminum:'Tanker Aluminum',tanker_intermodal:'Tanker Intermodal',tanker_steel:'Tanker Steel',van_air_ride:'Van Air Ride',van_conestoga:'Van Conestoga',van_double:'Van Double',van_hazmat:'Van Hazmat',van_hotshot:'Van Hotshot',van_insulated:'Van Insulated',van_intermodal:'Van Intermodal',van_lift_gate:'Van Lift Gate',van_open_top:'Van Open Top',van_roller_bed:'Van Roller Bed',van_triple:'Van Triple',van_vented:'Van Vented',van_blanket_wrap:'Van with Blanket Wrap',van_curtains:'Van with Curtains',van_pallet_exchange:'Van with Pallet Exchange',box:'Box (legacy)'};
+  const categoryLabels={tractor:'Semi Truck / Power Unit',power_only:'Power Only',flat_step_deck:'Flat Step Deck',flat_conestoga:'Flat Conestoga',straight_truck:'Box Truck (Straight Truck)',box_truck:'Box Truck',cargo_van:'Cargo Van / Sprinter Van',hot_shot:'Hot Shot',dry_van:'Dry Van',flatbed:'Flatbed',reefer:'Reefer',auto_carrier:'Auto Carrier',b_train:'B-Train',conestoga:'Conestoga',container:'Container',container_insulated:'Container Insulated',container_refrigerated:'Container Refrigerated',conveyor:'Conveyor',double_drop:'Double Drop',dump_trailer:'Dump Trailer',flatbed_air_ride:'Flatbed Air Ride',flatbed_conestoga:'Flatbed Conestoga',flatbed_double:'Flatbed Double',flatbed_hotshot:'Flatbed Hotshot',flatbed_maxi:'Flatbed Maxi',flatbed_overdimension:'Flatbed Overdimension',flatbed_with_chains:'Flatbed with Chains',flatbed_with_sides:'Flatbed with Sides',flatbed_with_tarps:'Flatbed with Tarps',hopper_bottom:'Hopper Bottom',insulated_van:'Insulated Van',lowboy:'Lowboy',moving_van:'Moving Van',pneumatic:'Pneumatic',reefer_air_ride:'Reefer Air Ride',reefer_double:'Reefer Double',reefer_hazmat:'Reefer Hazmat',reefer_intermodal:'Reefer Intermodal',reefer_logistics:'Reefer Logistics',reefer_pallet_exchange:'Reefer with Pallet Exchange',rgn:'Removable Gooseneck (RGN)',step_deck:'Step Deck',step_deck_conestoga:'Step Deck Conestoga',stretch_trailer:'Stretch Trailer',tanker:'Tanker',tanker_aluminum:'Tanker Aluminum',tanker_intermodal:'Tanker Intermodal',tanker_steel:'Tanker Steel',van_air_ride:'Van Air Ride',van_conestoga:'Van Conestoga',van_double:'Van Double',van_hazmat:'Van Hazmat',van_hotshot:'Van Hotshot',van_insulated:'Van Insulated',van_intermodal:'Van Intermodal',van_lift_gate:'Van Lift Gate',van_open_top:'Van Open Top',van_roller_bed:'Van Roller Bed',van_triple:'Van Triple',van_vented:'Van Vented',van_blanket_wrap:'Van with Blanket Wrap',van_curtains:'Van with Curtains',van_pallet_exchange:'Van with Pallet Exchange',box:'Box (legacy)'};
   const status = el('div','notice'); status.hidden=true;
   const say = (message, error=false) => { status.textContent=message; status.className='notice '+(error?'error':'success'); status.hidden=false; };
   const card = (title, copy) => { const c=el('section','card fleet-card'); c.append(el('h2','',title),el('p','muted',copy)); return c; };
@@ -100,47 +100,78 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
   const dhead=el('div','fleet-section-head');dhead.append(el('div','', 'Driver profiles'),el('p','muted','The primary account holder is already listed. Add employee drivers without creating portal logins.'));const addD=el('button','button primary','Add driver');addD.type='button';dhead.append(addD);driverRoot.append(dhead,status);
   const dform=el('div');driverRoot.append(dform);addD.addEventListener('click',()=>{dform.replaceChildren(driverForm(null).card)});
   const dlist=el('div','fleet-record-list');dlist.dataset.driverList='';driverRoot.append(dlist);
-  const equipmentForm = (kind, record=null) => {
+  const trailerCategories=[
+    ['dry_van','Dry Van'],['flatbed','Flatbed'],['reefer','Reefer'],
+    ['flat_step_deck','Flat Step Deck'],['flat_conestoga','Flat Conestoga'],
+    ['auto_carrier','Auto Carrier'],['b_train','B-Train'],['conestoga','Conestoga'],['container','Container'],['container_insulated','Container Insulated'],['container_refrigerated','Container Refrigerated'],['conveyor','Conveyor'],['double_drop','Double Drop'],['dump_trailer','Dump Trailer'],['flatbed_air_ride','Flatbed Air Ride'],['flatbed_double','Flatbed Double'],['flatbed_hotshot','Flatbed Hotshot'],['flatbed_maxi','Flatbed Maxi'],['flatbed_overdimension','Flatbed Overdimension'],['flatbed_with_chains','Flatbed with Chains'],['flatbed_with_sides','Flatbed with Sides'],['flatbed_with_tarps','Flatbed with Tarps'],['hopper_bottom','Hopper Bottom'],['insulated_van','Insulated Van'],['lowboy','Lowboy'],['moving_van','Moving Van'],['other','Other'],['pneumatic','Pneumatic'],['reefer_air_ride','Reefer Air Ride'],['reefer_double','Reefer Double'],['reefer_hazmat','Reefer Hazmat'],['reefer_intermodal','Reefer Intermodal'],['reefer_logistics','Reefer Logistics'],['reefer_pallet_exchange','Reefer with Pallet Exchange'],['rgn','Removable Gooseneck (RGN)'],['step_deck','Step Deck'],['step_deck_conestoga','Step Deck Conestoga'],['stretch_trailer','Stretch Trailer'],['tanker','Tanker'],['tanker_aluminum','Tanker Aluminum'],['tanker_intermodal','Tanker Intermodal'],['tanker_steel','Tanker Steel'],['van_air_ride','Van Air Ride'],['van_conestoga','Van Conestoga'],['van_double','Van Double'],['van_hazmat','Van Hazmat'],['van_hotshot','Van Hotshot'],['van_insulated','Van Insulated'],['van_intermodal','Van Intermodal'],['van_lift_gate','Van Lift Gate'],['van_open_top','Van Open Top'],['van_roller_bed','Van Roller Bed'],['van_triple','Van Triple'],['van_vented','Van Vented'],['van_blanket_wrap','Van with Blanket Wrap'],['van_curtains','Van with Curtains'],['van_pallet_exchange','Van with Pallet Exchange']
+  ];
+  const tractorCategories=[['tractor','Semi Truck / Power Unit'],['power_only','Power Only'],['box_truck','Box Truck'],['hot_shot','Hot Shot'],['cargo_van','Cargo Van / Sprinter Van']];
+  const equipmentForm = (kind, record=null, presetCategory=null) => {
     const isTrailer=kind==='trailer';
+    const categoryOptions=isTrailer?trailerCategories:[...tractorCategories,...(record?.equipment_category==='straight_truck'?[['straight_truck','Box Truck (legacy)']]:[]),...(record?.equipment_category==='box'?[['box','Box (legacy)']]:[])];
+    const currentCategory=presetCategory||record?.equipment_category||'';
     const defs=[
-      {label:'Equipment category',name:'equipment_category',options:(isTrailer?[
-        ['dry_van','Dry Van'],['flatbed','Flatbed'],['reefer','Reefer'],
-        ['auto_carrier','Auto Carrier'],['b_train','B-Train'],['conestoga','Conestoga'],['container','Container'],['container_insulated','Container Insulated'],['container_refrigerated','Container Refrigerated'],['conveyor','Conveyor'],['double_drop','Double Drop'],['dump_trailer','Dump Trailer'],['flatbed_air_ride','Flatbed Air Ride'],['flatbed_conestoga','Flatbed Conestoga'],['flatbed_double','Flatbed Double'],['flatbed_hotshot','Flatbed Hotshot'],['flatbed_maxi','Flatbed Maxi'],['flatbed_overdimension','Flatbed Overdimension'],['flatbed_with_chains','Flatbed with Chains'],['flatbed_with_sides','Flatbed with Sides'],['flatbed_with_tarps','Flatbed with Tarps'],['hopper_bottom','Hopper Bottom'],['insulated_van','Insulated Van'],['lowboy','Lowboy'],['moving_van','Moving Van'],['other','Other'],['pneumatic','Pneumatic'],['reefer_air_ride','Reefer Air Ride'],['reefer_double','Reefer Double'],['reefer_hazmat','Reefer Hazmat'],['reefer_intermodal','Reefer Intermodal'],['reefer_logistics','Reefer Logistics'],['reefer_pallet_exchange','Reefer with Pallet Exchange'],['rgn','Removable Gooseneck (RGN)'],['step_deck','Step Deck'],['step_deck_conestoga','Step Deck Conestoga'],['stretch_trailer','Stretch Trailer'],['tanker','Tanker'],['tanker_aluminum','Tanker Aluminum'],['tanker_intermodal','Tanker Intermodal'],['tanker_steel','Tanker Steel'],['van_air_ride','Van Air Ride'],['van_conestoga','Van Conestoga'],['van_double','Van Double'],['van_hazmat','Van Hazmat'],['van_hotshot','Van Hotshot'],['van_insulated','Van Insulated'],['van_intermodal','Van Intermodal'],['van_lift_gate','Van Lift Gate'],['van_open_top','Van Open Top'],['van_roller_bed','Van Roller Bed'],['van_triple','Van Triple'],['van_vented','Van Vented'],['van_blanket_wrap','Van with Blanket Wrap'],['van_curtains','Van with Curtains'],['van_pallet_exchange','Van with Pallet Exchange'],
-        ...(record?.equipment_category==='box'?[['box','Box (legacy)']]:[])
-      ]:[
-        ...(record?.equipment_category==='straight_truck'?[['straight_truck','Box Truck (Straight Truck)']]:[['box_truck','Box Truck (Straight Truck)']]),['cargo_van','Cargo Van / Sprinter Van'],['hot_shot','Hot Shot'],['other','Other'],['tractor','Semi Truck / Power Unit']
-      ]),value:record?.equipment_category||''},
-      {label:'Unit number',name:'unit_number',value:record?.unit_number||''},{label:'Year',name:'year',type:'number',value:record?.year||''},
-      {label:'Make',name:'make',value:record?.make||''},{label:'Model',name:'model',value:record?.model||''},{label:'VIN',name:'vin',value:record?.vin||''},
+      {label:'Equipment type',name:'equipment_category',options:categoryOptions,value:currentCategory},
+      {label:'Unit number',name:'unit_number',value:record?.unit_number||''},
+      {label:'Year',name:'year',type:'number',value:record?.year||''},
+      {label:'Make',name:'make',value:record?.make||''},{label:'Model',name:'model',value:record?.model||''},
+      {label:'VIN',name:'vin',value:record?.vin||''},
       {label:'License plate',name:'license_plate',value:record?.license_plate||''},{label:'Plate state',name:'license_plate_state',value:record?.license_plate_state||''},
-      {label:'GVWR (lbs)',name:'gvwr_lbs',type:'number',value:record?.gvwr_lbs||''},{label:'Front axle (lbs)',name:'front_axle_lbs',type:'number',value:record?.front_axle_lbs||''},{label:'Rear tandems (lbs)',name:'rear_tandem_lbs',type:'number',value:record?.rear_tandem_lbs||''},
-      {label:'Overall length (in)',name:'overall_length_inches',type:'number',value:record?.overall_length_inches||''},{label:'Overall width (in)',name:'overall_width_inches',type:'number',value:record?.overall_width_inches||''},{label:'Overall height (in)',name:'overall_height_inches',type:'number',value:record?.overall_height_inches||''},
+      {label:'GVWR (lbs)',name:'gvwr_lbs',type:'number',value:record?.gvwr_lbs||''},
       ...(isTrailer?[
-        {label:'Interior length (in)',name:'interior_length_inches',type:'number',value:record?.interior_length_inches||''},{label:'Interior width (in)',name:'interior_width_inches',type:'number',value:record?.interior_width_inches||''},{label:'Interior height (in)',name:'interior_height_inches',type:'number',value:record?.interior_height_inches||''},
-        {label:'Door width clearance (in)',name:'door_width_inches',type:'number',value:record?.door_width_inches||''},{label:'Door height clearance (in)',name:'door_height_inches',type:'number',value:record?.door_height_inches||''},
-        {label:'Minimum reefer temp (°F)',name:'reefer_temp_min_f',type:'number',value:record?.reefer_temp_min_f||''},{label:'Maximum reefer temp (°F)',name:'reefer_temp_max_f',type:'number',value:record?.reefer_temp_max_f||''}
+        {label:'Total trailer length (ft)',name:'total_length_feet',type:'number',value:record?.total_length_feet||''},
+        {label:'Door width clearance (in)',name:'door_width_inches',type:'number',value:record?.door_width_inches||''},
+        {label:'Door height clearance (in)',name:'door_height_inches',type:'number',value:record?.door_height_inches||''},
+        {label:'Floor type',name:'floor_type',options:[['wood','Wood'],['aluminum','Aluminum'],['other','Other']],value:record?.floor_type||''},
+        {label:'Door style',name:'door_type',options:[['swing','Swing doors'],['roll_up','Roll-up']],value:record?.door_type||''},
+        {label:'Minimum reefer temp (°F)',name:'reefer_temp_min_f',type:'number',value:record?.reefer_temp_min_f||''},
+        {label:'Maximum reefer temp (°F)',name:'reefer_temp_max_f',type:'number',value:record?.reefer_temp_max_f||''}
       ]:[]),
+      ...(currentCategory==='box_truck'||record?.equipment_category==='box_truck'?[
+        {label:'Total cargo-body length (ft)',name:'total_length_feet',type:'number',value:record?.total_length_feet||''},
+        {label:'Door width clearance (in)',name:'door_width_inches',type:'number',value:record?.door_width_inches||''},
+        {label:'Door height clearance (in)',name:'door_height_inches',type:'number',value:record?.door_height_inches||''},
+        {label:'Floor type',name:'floor_type',options:[['wood','Wood'],['aluminum','Aluminum'],['other','Other']],value:record?.floor_type||''},
+        {label:'Door style',name:'door_type',options:[['swing','Swing doors'],['roll_up','Roll-up']],value:record?.door_type||''}
+      ]:[]),
+      ...(isTrailer?[]:[
+        {label:'Front axle (lbs)',name:'front_axle_lbs',type:'number',value:record?.front_axle_lbs||''},
+        {label:'Rear tandems (lbs)',name:'rear_tandem_lbs',type:'number',value:record?.rear_tandem_lbs||''}
+      ]),
       {label:'Has liftgate',name:'has_liftgate',type:'checkbox',value:record?.has_liftgate||false},
       {label:'Notes',name:'notes',value:record?.notes||'',full:true}
     ];
-    const {card:c,form,refs}=formCard(record?'Edit equipment':(isTrailer?'Add trailer':'Add Semi Truck / Power Unit'),defs,async values=>{
-      if(!values.equipment_category)throw new Error('Choose an equipment category.');
-      const payload={carrier_user_id:carrierUserId,equipment_kind:kind,equipment_category:values.equipment_category,unit_number:values.unit_number||null,year:values.year?Number(values.year):null,make:values.make||null,model:values.model||null,vin:values.vin||null,license_plate:values.license_plate||null,license_plate_state:values.license_plate_state||null,gvwr_lbs:values.gvwr_lbs?Number(values.gvwr_lbs):null,front_axle_lbs:values.front_axle_lbs?Number(values.front_axle_lbs):null,rear_tandem_lbs:values.rear_tandem_lbs?Number(values.rear_tandem_lbs):null,overall_length_inches:values.overall_length_inches?Number(values.overall_length_inches):null,overall_width_inches:values.overall_width_inches?Number(values.overall_width_inches):null,overall_height_inches:values.overall_height_inches?Number(values.overall_height_inches):null,interior_length_inches:values.interior_length_inches?Number(values.interior_length_inches):null,interior_width_inches:values.interior_width_inches?Number(values.interior_width_inches):null,interior_height_inches:values.interior_height_inches?Number(values.interior_height_inches):null,door_width_inches:values.door_width_inches?Number(values.door_width_inches):null,door_height_inches:values.door_height_inches?Number(values.door_height_inches):null,reefer_temp_min_f:values.reefer_temp_min_f?Number(values.reefer_temp_min_f):null,reefer_temp_max_f:values.reefer_temp_max_f?Number(values.reefer_temp_max_f):null,has_liftgate:refs.has_liftgate.checked,notes:values.notes||null};
+    const heading=record?'Edit equipment':(isTrailer?'Add trailer details':'Add truck / power unit details');
+    const {card:c,form,refs}=formCard(heading,defs,async values=>{
+      const category=values.equipment_category||currentCategory;
+      if(!category)throw new Error('Choose an equipment type.');
+      const isBox=category==='box_truck'||category==='straight_truck'||category==='box';
+      const isEnclosed=(isTrailer&&['dry_van','reefer'].includes(category))||isBox;
+      const hasFloor=['dry_van','box_truck','straight_truck','box'].includes(category);
+      const hasDoor=['dry_van','reefer','box_truck','straight_truck','box'].includes(category);
+      const payload={carrier_user_id:carrierUserId,equipment_kind:kind,equipment_category:category,unit_number:values.unit_number||null,year:values.year?Number(values.year):null,make:values.make||null,model:values.model||null,vin:values.vin||null,license_plate:values.license_plate||null,license_plate_state:values.license_plate_state||null,gvwr_lbs:values.gvwr_lbs?Number(values.gvwr_lbs):null,front_axle_lbs:values.front_axle_lbs?Number(values.front_axle_lbs):null,rear_tandem_lbs:values.rear_tandem_lbs?Number(values.rear_tandem_lbs):null,overall_length_inches:record?.overall_length_inches??null,overall_width_inches:record?.overall_width_inches??null,overall_height_inches:record?.overall_height_inches??null,interior_length_inches:record?.interior_length_inches??null,interior_width_inches:record?.interior_width_inches??null,interior_height_inches:record?.interior_height_inches??null,total_length_feet:isEnclosed&&values.total_length_feet?Number(values.total_length_feet):null,door_width_inches:isEnclosed&&values.door_width_inches?Number(values.door_width_inches):null,door_height_inches:isEnclosed&&values.door_height_inches?Number(values.door_height_inches):null,floor_type:hasFloor?(values.floor_type||null):null,door_type:hasDoor?(values.door_type||null):null,reefer_temp_min_f:category==='reefer'&&values.reefer_temp_min_f?Number(values.reefer_temp_min_f):null,reefer_temp_max_f:category==='reefer'&&values.reefer_temp_max_f?Number(values.reefer_temp_max_f):null,has_liftgate:refs.has_liftgate.checked,notes:values.notes||null};
       const q=record?supabase.from('carrier_equipment').update(payload).eq('id',record.id).eq('carrier_user_id',carrierUserId):supabase.from('carrier_equipment').insert(payload);
       const {error}=await q;if(error)throw error;say('Equipment saved.');await renderEquipment();
-    },record?'Save equipment':(isTrailer?'Add trailer':'Add Semi Truck / Power Unit'));
-    if(isTrailer){
-      const clearanceNames=['interior_length_inches','interior_width_inches','interior_height_inches','door_width_inches','door_height_inches'];
-      const toggleClearance=()=>{const openDeck=['flatbed','step_deck','conestoga'].includes(refs.equipment_category.value);for(const name of clearanceNames){const wrap=refs[name]?.closest('.fleet-field');if(wrap)wrap.hidden=openDeck;}};
-      refs.equipment_category.addEventListener('change',toggleClearance);toggleClearance();
-    }
+    },record?'Save equipment':(isTrailer?'Save trailer':'Save truck / power unit'));
+    const toggleTypeFields=()=>{
+      const category=refs.equipment_category.value||currentCategory;
+      const isBox=['box_truck','straight_truck','box'].includes(category);
+      const isEnclosed=(isTrailer&&['dry_van','reefer'].includes(category))||isBox;
+      const showFloor=['dry_van','box_truck','straight_truck','box'].includes(category);
+      const showDoor=['dry_van','reefer','box_truck','straight_truck','box'].includes(category);
+      for(const name of ['total_length_feet','door_width_inches','door_height_inches']){const wrap=refs[name]?.closest('.fleet-field');if(wrap)wrap.hidden=!isEnclosed;}
+      const floorWrap=refs.floor_type?.closest('.fleet-field');if(floorWrap)floorWrap.hidden=!showFloor;
+      const doorWrap=refs.door_type?.closest('.fleet-field');if(doorWrap)doorWrap.hidden=!showDoor;
+      for(const name of ['reefer_temp_min_f','reefer_temp_max_f']){const wrap=refs[name]?.closest('.fleet-field');if(wrap)wrap.hidden=category!=='reefer';}
+    };
+    refs.equipment_category.addEventListener('change',toggleTypeFields);toggleTypeFields();
     const cancel=el('button','button','Cancel');cancel.type='button';cancel.addEventListener('click',()=>c.remove());form.querySelector('.fleet-actions').append(cancel);
     return c;
   };
   const equipmentCard = e => {
     const c=el('details','fleet-record');const summary=el('summary');summary.append(el('strong','',(e.unit_number?'Unit '+e.unit_number+' · ':'')+[e.year,e.make,e.model].filter(Boolean).join(' ')||categoryLabels[e.equipment_category]||e.equipment_category),el('span','fleet-record-meta',(e.equipment_kind==='tractor'?'Semi Truck / Power Unit':'Trailer')+' · '+(categoryLabels[e.equipment_category]||e.equipment_category.replaceAll('_',' '))+' · VIN '+(e.vin||'—')));c.append(summary);
     const body=el('div','fleet-record-body');const info=el('div','fleet-info-grid');
-    [['License plate',[e.license_plate,e.license_plate_state].filter(Boolean).join(' / ')],['GVWR',e.gvwr_lbs?e.gvwr_lbs+' lbs':'—'],['Front axle',e.front_axle_lbs?e.front_axle_lbs+' lbs':'—'],['Rear tandems',e.rear_tandem_lbs?e.rear_tandem_lbs+' lbs':'—'],['Overall dimensions',[e.overall_length_inches,e.overall_width_inches,e.overall_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—'],['Interior dimensions',[e.interior_length_inches,e.interior_width_inches,e.interior_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—'],['Door clearance',[e.door_width_inches,e.door_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—']].forEach(([k,v])=>{const x=el('div');x.append(el('small','',k),el('strong','',v));info.append(x)});body.append(info);
+    [['License plate',[e.license_plate,e.license_plate_state].filter(Boolean).join(' / ')],['GVWR',e.gvwr_lbs?e.gvwr_lbs+' lbs':'—'],['Front axle',e.front_axle_lbs?e.front_axle_lbs+' lbs':'—'],['Rear tandems',e.rear_tandem_lbs?e.rear_tandem_lbs+' lbs':'—'],['Total length',e.total_length_feet?e.total_length_feet+' ft':'—'],['Door clearance',[e.door_width_inches,e.door_height_inches].map(x=>x?x+' in':null).filter(Boolean).join(' × ')||'—'],['Floor type',e.floor_type||'—'],['Door style',e.door_type==='roll_up'?'Roll-up':e.door_type==='swing'?'Swing doors':'—'].forEach(([k,v])=>{const x=el('div');x.append(el('small','',k),el('strong','',v));info.append(x)});body.append(info);
     const edit=el('button','button','Edit equipment');edit.type='button';edit.addEventListener('click',()=>body.prepend(equipmentForm(e.equipment_kind,e)));body.append(edit);
     const docsBox=el('div');body.append(docsBox);const loadDocs=async()=>{const {data,error}=await supabase.from('carrier_equipment_documents').select('*').eq('carrier_user_id',carrierUserId).eq('equipment_id',e.id).order('uploaded_at',{ascending:false});if(error){say(error.message,true);return}docsBox.replaceChildren(docSection('equipment',e.id,data,loadDocs))};loadDocs();c.append(body);return c;
   };
@@ -160,8 +191,33 @@ export async function initFleetManager({ supabase, carrierUserId, driverRoot, eq
     profiles.forEach(p=>{const line=el('article','fleet-record');line.append(el('strong','',p.profile_name),el('p','fleet-record-meta',(p.tractor?.unit_number||p.tractor?.make||'Semi Truck / Power Unit')+' + '+(p.is_power_only?'Power only':p.trailer?.unit_number||p.trailer?.make||'Trailer')+' · '+((p.carrier_truck_profile_drivers||[]).map(x=>x.carrier_drivers?.display_name).filter(Boolean).join(', ')||'No drivers assigned')));box.append(line)});
   };
   equipmentRoot.replaceChildren();
-  const ehead=el('div','fleet-section-head');ehead.append(el('div','', 'Equipment inventory'),el('p','muted','Save power units and trailers independently. Add photos, VIN images, plates, and equipment documents to each record.'));const addT=el('button','button primary','Add Semi Truck / Power Unit');addT.type='button';const addR=el('button','button','Add trailer');addR.type='button';ehead.append(addT,addR);equipmentRoot.append(ehead,status);
-  const eform=el('div');equipmentRoot.append(eform);addT.addEventListener('click',()=>eform.replaceChildren(equipmentForm('tractor')));addR.addEventListener('click',()=>eform.replaceChildren(equipmentForm('trailer')));
+  const ehead=el('div','fleet-section-head');ehead.append(el('div','', 'Equipment inventory'),el('p','muted','Choose an equipment type first. The details shown will depend on the truck or trailer selected.'));equipmentRoot.append(ehead,status);
+  const typePicker=el('section','fleet-type-picker');typePicker.append(el('h3','','Add equipment type'));
+  const primaryTypes=[['dry_van','Dry Van'],['flatbed','Flat Bed'],['reefer','Reefer'],['power_only','Power Only']];
+  const primaryRow=el('div','fleet-type-primary');
+  const eform=el('div');equipmentRoot.append(typePicker,eform);
+  const openTypeSetup=(category)=>{
+    eform.replaceChildren();
+    const pair=['dry_van','flatbed','reefer'].includes(category);
+    if(pair){
+      eform.append(el('h3','',categoryLabels[category]||category+' setup'));
+      eform.append(el('p','muted','Add the power unit and the matching trailer. Each record is saved separately so it can be edited and documented independently.'));
+      const tractorForm=equipmentForm('tractor',null,'tractor');
+      const trailerForm=equipmentForm('trailer',null,category);
+      eform.append(tractorForm,trailerForm);
+    }else if(category==='power_only'){
+      eform.append(equipmentForm('tractor',null,'power_only'));
+    }else if(category==='box_truck'||category==='hot_shot'||category==='cargo_van'){
+      eform.append(equipmentForm('tractor',null,category));
+    }else{
+      eform.append(el('h3','',categoryLabels[category]||category.replaceAll('_',' ')));
+      eform.append(el('p','muted','Add the power unit and trailer as separate records.'));
+      eform.append(equipmentForm('tractor',null,'tractor'));
+      eform.append(equipmentForm('trailer',null,category));
+    }
+  };
+  primaryTypes.forEach(([value,label])=>{const button=el('button','button',label);button.type='button';button.addEventListener('click',()=>openTypeSetup(value));primaryRow.append(button)});typePicker.append(primaryRow);
+  const moreWrap=el('div','fleet-type-more');const more=el('select');more.append(new Option('More equipment types…',''));[['box_truck','Box Truck'],['hot_shot','Hot Shot'],['flat_step_deck','Flat Step Deck'],['flat_conestoga','Flat Conestoga'],...trailerCategories.filter(([v])=>!['dry_van','flatbed','reefer','flat_step_deck','flat_conestoga'].includes(v))].forEach(([v,t])=>more.append(new Option(t,v)));more.addEventListener('change',()=>{if(more.value)openTypeSetup(more.value);});moreWrap.append(more);typePicker.append(moreWrap);
   const list=el('div');list.dataset.equipmentList='';equipmentRoot.append(list);
   const profiles=card('Saved truck profiles','Pair one Semi Truck / Power Unit with an optional trailer, then assign one or more drivers. A power unit can appear in multiple saved profiles.');
   const pform=el('form','fleet-form');const pgrid=el('div','fleet-form-grid');pform.append(pgrid);profiles.append(pform);
