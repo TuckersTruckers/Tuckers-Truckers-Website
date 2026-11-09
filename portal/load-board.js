@@ -25,7 +25,14 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
   const search = $('input','load-board-search'); search.type='search'; search.placeholder='Search PO, broker, city, or load number';
   const filter = $('select','load-board-filter'); [['','All statuses'],['draft','Draft'],['booked','Booked'],['dispatched','Dispatched'],['at_pickup','At pickup'],['loaded','Loaded'],['in_transit','In transit'],['at_delivery','At delivery'],['delivered','Delivered'],['on_hold','On hold'],['canceled','Canceled']].forEach(([v,t])=>filter.append(new Option(t,v)));
   tools.append(search,filter);
-  if(canManage) header.append(button('Build Load +','button primary',()=>{formCard.hidden=!formCard.hidden; if(!formCard.hidden)formCard.scrollIntoView({behavior:'smooth',block:'start'});}));
+  if(canManage){
+    const headerActions=$('div','load-board-header-actions');
+    headerActions.append(
+      button('Upload Rate Confirmation','button',()=>window.dispatchEvent(new CustomEvent('tt-open-rate-confirmation'))),
+      button('Build Load +','button primary',()=>{formCard.hidden=!formCard.hidden; if(!formCard.hidden)formCard.scrollIntoView({behavior:'smooth',block:'start'});})
+    );
+    header.append(headerActions);
+  }
   root.replaceChildren(header,notice,tools);
   const formCard = $('section','load-board-form card'); formCard.hidden=true;
   const list = $('div','load-board-list');
