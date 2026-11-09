@@ -5,7 +5,14 @@ export async function initRateConfirmation({supabase,user,role,root}) {
   const notice=$("div","rate-intake-notice");notice.hidden=true;
   const say=(m,bad=false)=>{notice.textContent=m;notice.className="rate-intake-notice"+(bad?" error":"");notice.hidden=false};
   const card=$("section","rate-intake-card");
-  const head=$("div","rate-intake-head");head.append($("div","rate-intake-title","Upload Rate Confirmation"),$("p","","Upload the broker's original PDF or image. AI will extract the shipment details for your review. Nothing is published until you approve it."));
+  const head=$("div","rate-intake-head");
+  const headCopy=$("div");
+  headCopy.append(
+    $("div","rate-intake-title","Upload Rate Confirmation"),
+    $("p","","Upload the broker's original PDF or image. AI will extract the shipment details for your review. Nothing is published until you approve it.")
+  );
+  const closePanel=btn("Close",()=>{root.hidden=true;review.hidden=true});
+  head.append(headCopy,closePanel);
   const upload=$("div","rate-intake-upload");
   const carrierLabel=$("label","rate-intake-field");carrierLabel.append($("span","","Carrier"));
   const carrier=$("select");carrier.append(new Option("Select carrier",""));carrierLabel.append(carrier);
@@ -14,7 +21,13 @@ export async function initRateConfirmation({supabase,user,role,root}) {
   const uploadBtn=btn("Upload and extract",()=>startExtraction(),true);upload.append(carrierLabel,fileLabel,uploadBtn);
   const list=$("div","rate-intake-list");
   const review=$("section","rate-intake-review");review.hidden=true;
-  card.append(head,notice,upload,list,review);root.replaceChildren(card);
+  card.append(head,notice,upload,list,review);
+  root.replaceChildren(card);
+  root.hidden=true;
+  window.addEventListener("tt-open-rate-confirmation",()=>{
+    root.hidden=false;
+    card.scrollIntoView({behavior:"smooth",block:"start"});
+  });
 
   const {data:carriers,error:carrierError}=await supabase.from("carrier_profiles").select("user_id,business_name,company_name,mc_number").order("business_name");
   if(carrierError){say("Could not load your authorized carriers: "+carrierError.message,true);return}
