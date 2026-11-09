@@ -121,11 +121,28 @@ Deno.serve(async (req: Request) => {
     const { data: authData, error: authError } = await supabase.auth.getUser(token);
     if (authError || !authData.user) return jsonResponse({ error: "Your session could not be verified." }, 401);
 
+    // Match the portal's existing administrator authorization source.
+    // is_portal_admin() checks portal_admins for the authenticated auth.uid().
+    const { data: isPortalAdmin, error: adminError } =
+      await supabase.rpc("is_portal_admin");
+    if (adminError) throw adminError;
+
+    // Preserve access for dispatcher roles that are not listed in portal_admins.
     const { data: roleRow, error: roleError } = await supabase
-      .from("portal_user_roles").select("role").eq("user_id", authData.user.id).maybeSingle();
+      .from("portal_user_roles")
+      .select("role")
+      .eq("user_id", authData.user.id)
+      .maybeSingle();
     if (roleError) throw roleError;
-    if (!roleRow || !["platform_owner", "dispatcher", "dispatcher_admin"].includes(roleRow.role)) {
-      return jsonResponse({ error: "Only authorized dispatch users can extract rate confirmations." }, 403);
+
+    const hasDispatcherRole =
+      roleRow &&
+      ["platform_owner", "dispatcher", "dispatcher_admin"].includes(roleRow.role);
+
+    if (!isPortalAdmin && !hasDispatcherRole) {
+      return jsonResponse({
+        error: "Only authorized dispatch users can extract rate confirmations.",
+      }, 403);
     }
 
     const body = await req.json();
