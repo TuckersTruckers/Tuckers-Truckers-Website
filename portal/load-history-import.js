@@ -212,6 +212,14 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
         const {error:stopError}=await supabase.from('dispatch_load_stops').insert(stops);if(stopError)throw stopError;
         const {error:financialError}=await supabase.from('dispatch_load_financials').insert({load_id:loadId,carrier_pay:row.carrier_pay,source_rpm:row.source_rpm,market_rpm:row.market_rpm,updated_by:user.id});
         if(financialError)throw financialError;
+        if(row.accessorial_amount!==null && row.accessorial_amount>0){
+          const rawType=normalize(row.accessorial_type||'other');
+          const typeMap={detention:'detention',layover:'layover',tonu:'tonu',lumper:'lumper','stop off':'stop_off','driver assist':'driver_assist'};
+          const accessorialType=typeMap[rawType]||'other';
+          const description=accessorialType==='other' ? (row.accessorial_type||'Unspecified additional payment') : null;
+          const {error:accessorialError}=await supabase.from('dispatch_load_accessorials').insert({load_id:loadId,accessorial_type:accessorialType,description,amount:row.accessorial_amount,payment_status:'received',created_by:user.id});
+          if(accessorialError)throw accessorialError;
+        }
         imported++;
       }catch(e){
         failed++;
