@@ -21,6 +21,10 @@ create unique index if not exists dispatch_loads_carrier_source_import_key_uidx
   where source_import_key is not null;
 
 -- Collapse spreadsheet-era operational states into the five product states.
+-- Drop the old constraint first so legacy values can be remapped safely.
+alter table public.dispatch_loads
+  drop constraint if exists dispatch_loads_status_check;
+
 update public.dispatch_loads
 set status = case
   when status = 'draft' then 'pending'
@@ -29,9 +33,6 @@ set status = case
   else status
 end
 where status in ('draft','dispatched','at_pickup','loaded','at_delivery','on_hold');
-
-alter table public.dispatch_loads
-  drop constraint if exists dispatch_loads_status_check;
 
 alter table public.dispatch_loads
   add constraint dispatch_loads_status_check
