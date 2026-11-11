@@ -103,6 +103,7 @@ function mapRows(matrix) {
     if(!row.pickup_city||!row.pickup_state)row.errors.push('Missing pickup city/state');
     if(!row.delivery_city||!row.delivery_state)row.errors.push('Missing delivery city/state');
     if(row.carrier_pay===null)row.errors.push('Missing or invalid gross carrier pay');
+    row.base_errors=[...row.errors];
     rows.push(row);
   });
   return rows;
