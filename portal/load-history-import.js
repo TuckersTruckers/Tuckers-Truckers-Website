@@ -134,8 +134,7 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
   let parsedRows=[];
   const notice=(message,isError=false)=>onNotice?.(message,isError);
   const renderPreview=async rows=>{
-    const valid=rows.filter(r=>!r.errors.length);
-    const invalid=rows.length-valid.length;
+    rows.forEach(r=>{r.errors=[...(r.base_errors||r.errors||[])]});
     const keys=new Set();let duplicateInFile=0;
     rows.forEach(r=>{if(keys.has(r.source_import_key)){r.errors.push('Duplicate row in this file');duplicateInFile++}else keys.add(r.source_import_key)});
     const carrierId=carrier.value;
@@ -168,7 +167,7 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
     try{
       const workbook=XLSX.read(await file.files[0].arrayBuffer(),{type:'array',cellDates:true});
       const sheet=workbook.Sheets[workbook.SheetNames[0]];
-      const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
+      const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});
       if(!matrix.length)throw new Error('The selected file is empty.');
       await renderPreview(mapRows(matrix));
       preview.hidden=false;
