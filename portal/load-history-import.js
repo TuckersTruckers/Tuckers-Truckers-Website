@@ -43,7 +43,11 @@ function findColumn(headers, names, occurrence=0) {
 }
 
 function mapRows(matrix) {
-  const headers=(matrix[0]||[]).map(x=>String(x??'').trim());
+  const headerIndex=Math.max(0,matrix.findIndex(row=>{
+    const names=(row||[]).map(normalize);
+    return names.includes('po') && names.some(x=>x==='broker'||x==='brokerage') && names.filter(x=>x==='date'||x==='pickup date'||x==='delivery date').length>=1;
+  }));
+  const headers=(matrix[headerIndex]||[]).map(x=>String(x??'').trim());
   const col={
     po:findColumn(headers,['po','po #','po number','po no']),
     pickupDate:findColumn(headers,['date','pickup date','pick up date'],0),
@@ -67,7 +71,7 @@ function mapRows(matrix) {
   const missing=['po','pickupDate','pickupCity','pickupState','deliveryDate','deliveryCity','deliveryState','pay'].filter(k=>col[k]<0);
   if(missing.length)throw new Error('Could not identify required columns: '+missing.join(', ')+'. Check that the first row contains the column headings.');
   const rows=[];
-  matrix.slice(1).forEach((cells,index)=>{
+  matrix.slice(headerIndex+1).forEach((cells,index)=>{
     const value=k=>col[k]>=0?cells[col[k]]:null;
     if(cells.every(v=>String(v??'').trim()===''))return;
     const row={
