@@ -232,14 +232,14 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
       const metaValues=[['Carrier',carrierName(load.carrier_user_id)],['Driver',isDriver?'You':(driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned')],['Miles',safe(load.miles)],['Deadhead',safe(load.deadhead_miles)],['Weight',load.weight_lbs?Number(load.weight_lbs).toLocaleString()+' lb':'—']];
       if(!fixedCarrierId && canManage)metaValues[0][1]=carrierName(load.carrier_user_id);
       metaValues.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',v));meta.append(x)});
-      if(!isDriver && fin){const x=$('div');x.append($('small','','Gross carrier pay'),$('strong','',money(fin.carrier_pay)));meta.append(x);const rpm=$('div');rpm.append($('small','','Carrier RPM'),$('strong','',fin.source_rpm!=null?'$'+Number(fin.source_rpm).toFixed(2):(load.miles>0&&fin.carrier_pay!=null?'$'+(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—')));meta.append(rpm)}
+      if(!isDriver && fin){const x=$('div');x.append($('small','','Gross carrier pay'),$('strong','',money(fin.carrier_pay)));meta.append(x);const calculatedRpm=(load.miles>0&&fin.carrier_pay!=null)?'$'+(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):(fin.source_rpm!=null?'$'+Number(fin.source_rpm).toFixed(2):'—');const rpm=$('div');rpm.append($('small','','Carrier RPM'),$('strong','',calculatedRpm));meta.append(rpm)}
       const actions=$('div','load-card-actions');
       const detail=button('View details','button',()=>detailPanel.hidden=!detailPanel.hidden);
       const detailPanel=$('div','load-detail-panel');detailPanel.hidden=true;
       detailPanel.append($('h3','','Load details'));
       const info=$('div','load-detail-grid');
       const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)],['Assigned driver',isDriver?'You':(driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned')]];
-      if(!isDriver&&fin)pairs.push(['Gross carrier pay',money(fin.carrier_pay)],['Source RPM',fin.source_rpm??(load.miles>0&&fin.carrier_pay!=null?'$'+(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—')],['Market RPM',fin.market_rpm??'—'],['Market RPM source',fin.market_rpm_source??'Not provided']);
+      if(!isDriver&&fin){const calculatedRpm=(load.miles>0&&fin.carrier_pay!=null)?'$'+(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):(fin.source_rpm??'—');pairs.push(['Gross carrier pay',money(fin.carrier_pay)],['Calculated RPM',calculatedRpm],['Market RPM',fin.market_rpm??'—'],['Market RPM source',fin.market_rpm_source??'Not provided']);}
       if(load.load_notes)pairs.push(['Load notes',load.load_notes]);
       pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
       detailPanel.append(info);
