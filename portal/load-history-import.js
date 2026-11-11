@@ -206,4 +206,5 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
     await onImported?.();
     importButton.disabled=true;importButton.textContent='Import valid loads';
   });
+  return section;
 }
