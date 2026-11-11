@@ -5,8 +5,8 @@ const clean = value => value === null || value === undefined || String(value).tr
 const numeric = value => {
   if (value === null || value === undefined || String(value).trim()==='') return null;
   if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null;
-  let s=String(value).trim().replace(/[$,\\s]/g,'').replace(/%$/,'');
-  const negative=/^\\(.*\\)$/.test(s); if(negative)s=s.slice(1,-1);
+  let s=String(value).trim().replace(/[$,\s]/g,'').replace(/%$/,'');
+  const negative=/^\(.*\)$/.test(s); if(negative)s=s.slice(1,-1);
   const n=Number(s);
   return Number.isFinite(n) && n>=0 && !negative ? n : null;
 };
@@ -18,9 +18,9 @@ const dateOnly = (value, XLSXLib) => {
     if(p?.y&&p?.m&&p?.d)return [p.y,String(p.m).padStart(2,'0'),String(p.d).padStart(2,'0')].join('-');
   }
   const s=String(value).trim();
-  const m=s.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{2,4})$/);
+  const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
   if(m){let y=Number(m[3]);if(y<100)y+=y<50?2000:1900;return [y,String(Number(m[1])).padStart(2,'0'),String(Number(m[2])).padStart(2,'0')].join('-')}
-  const iso=s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})/);
+  const iso=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if(iso)return [iso[1],String(Number(iso[2])).padStart(2,'0'),String(Number(iso[3])).padStart(2,'0')].join('-');
   return null;
 };
