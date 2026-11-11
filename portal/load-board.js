@@ -1,3 +1,5 @@
+import { initLoadHistoryImport } from './load-history-import.js';
+
 export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}) {
   if (!supabase || !user || !role || !root) return;
   const canManage = role === 'platform_owner' || role === 'dispatcher' || role === 'dispatcher_admin';
@@ -15,7 +17,8 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
   const safe = v => v === null || v === undefined || v === '' ? '—' : String(v);
   const money = v => v === null || v === undefined ? '—' : new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(v));
   const fmtDate = v => v ? new Date(v).toLocaleString() : 'Not entered';
-  const statusText = s => (s || 'booked').replaceAll('_',' ');
+  const statusText = s => ({pending:'Pending',booked:'Booked',in_transit:'In Transit',delivered:'Delivered',canceled:'Canceled'}[s] || 'Pending');
+  const stopSchedule = st => [st?.appointment_date,st?.appointment_label || (st?.appointment_type==='fcfs'?'FCFS':(st?.appointment_start?fmtDate(st.appointment_start):''))].filter(Boolean).join(' · ') || 'Not entered';
   const notice = $('div','load-board-notice'); notice.hidden = true;
   const say = (msg,error=false) => { notice.textContent=msg; notice.className='load-board-notice'+(error?' error':''); notice.hidden=false; };
   const header = $('div','load-board-header');
@@ -23,11 +26,12 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
   header.append(intro);
   const tools = $('div','load-board-tools');
   const search = $('input','load-board-search'); search.type='search'; search.placeholder='Search PO, broker, city, or load number';
-  const filter = $('select','load-board-filter'); [['','All statuses'],['draft','Draft'],['booked','Booked'],['dispatched','Dispatched'],['at_pickup','At pickup'],['loaded','Loaded'],['in_transit','In transit'],['at_delivery','At delivery'],['delivered','Delivered'],['on_hold','On hold'],['canceled','Canceled']].forEach(([v,t])=>filter.append(new Option(t,v)));
+  const filter = $('select','load-board-filter'); [['','All statuses'],['pending','Pending'],['booked','Booked'],['in_transit','In Transit'],['delivered','Delivered'],['canceled','Canceled']].forEach(([v,t])=>filter.append(new Option(t,v)));
   tools.append(search,filter);
   if(canManage){
     const headerActions=$('div','load-board-header-actions');
     headerActions.append(
+      button('Import Load History','button',()=>{if(importCard){importCard.hidden=!importCard.hidden;if(!importCard.hidden)importCard.scrollIntoView({behavior:'smooth',block:'start'})}}),
       button('Upload Rate Confirmation','button',()=>window.dispatchEvent(new CustomEvent('tt-open-rate-confirmation'))),
       button('Build Load +','button primary',()=>{formCard.hidden=!formCard.hidden; if(!formCard.hidden)formCard.scrollIntoView({behavior:'smooth',block:'start'});})
     );
@@ -35,6 +39,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
   }
   root.replaceChildren(header,notice,tools);
   const formCard = $('section','load-board-form card'); formCard.hidden=true;
+  let importCard=null;
   const list = $('div','load-board-list');
   root.append(formCard,list);
 
@@ -52,6 +57,11 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
     const {data,error}=await supabase.from('carrier_profiles').select('user_id,business_name,company_name,mc_number').eq('user_id',selectedCarrier).maybeSingle();
     if(error) say(error.message,true);
     carrierChoices=data?[data]:[];
+  }
+
+  if(canManage){
+    importCard=await initLoadHistoryImport({supabase,user,carriers:carrierChoices,root,onNotice:say,onImported:async()=>{await refresh()}});
+    if(importCard)root.insertBefore(importCard,list);
   }
 
   const carrierSelect = $('select',''); carrierSelect.append(new Option('Select carrier',''));
@@ -141,7 +151,7 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
         driver_id:driverChoice.startsWith('record:')?driverChoice.slice(7):null,
         driver_user_id:driverChoice.startsWith('profile:')?driverChoice.slice(8):null,
         truck_profile_id:truckSelect.value||null,
-        created_by:user.id,status:'draft',internal_notes:inputs.internal_notes.value.trim()||null};
+        created_by:user.id,status:'pending',internal_notes:inputs.internal_notes.value.trim()||null};
       for(const key of ['po_number','broker_load_number','pickup_number','bol_number','broker_name','broker_contact_name','broker_phone','broker_email','commodity'])payload[key]=inputs[key].value.trim()||null;
       for(const key of ['weight_lbs','miles','deadhead_miles'])payload[key]=inputs[key].value?Number(inputs[key].value):null;
       const {data:load,error}=await supabase.from('dispatch_loads').insert(payload).select('id').single();
@@ -212,9 +222,9 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
       const badge=$('span','load-status load-status-'+load.status,statusText(load.status));
       top.append(name,badge);
       const route=$('div','load-route');
-      const from=$('div');from.append($('small','','PICKUP'),$('strong','',[p?.city,p?.state].filter(Boolean).join(', ')||'Not entered'),$('span','',fmtDate(p?.appointment_start)));
+      const from=$('div');from.append($('small','','PICKUP'),$('strong','',[p?.city,p?.state].filter(Boolean).join(', ')||'Not entered'),$('span','',stopSchedule(p)));
       const arrow=$('span','load-route-arrow','→');
-      const to=$('div');to.append($('small','','DELIVERY'),$('strong','',[d?.city,d?.state].filter(Boolean).join(', ')||'Not entered'),$('span','',fmtDate(d?.appointment_start)));
+      const to=$('div');to.append($('small','','DELIVERY'),$('strong','',[d?.city,d?.state].filter(Boolean).join(', ')||'Not entered'),$('span','',stopSchedule(d)));
       route.append(from,arrow,to);
       const meta=$('div','load-card-meta');
       const metaValues=[['Carrier',carrierName(load.carrier_user_id)],['Driver',isDriver?'You':(driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned')],['Miles',safe(load.miles)],['Deadhead',safe(load.deadhead_miles)],['Weight',load.weight_lbs?Number(load.weight_lbs).toLocaleString()+' lb':'—']];
@@ -227,16 +237,48 @@ export async function initLoadBoard({supabase,user,role,root,carrierUserId=null}
       detailPanel.append($('h3','','Load details'));
       const info=$('div','load-detail-grid');
       const pairs=[['PO number',load.po_number],['Broker load #',load.broker_load_number],['Pickup #',load.pickup_number],['BOL #',load.bol_number],['Broker',load.broker_name],['Broker contact',load.broker_contact_name],['Broker phone',load.broker_phone],['Broker email',load.broker_email],['Commodity',load.commodity],['Weight',load.weight_lbs],['Loaded miles',load.miles],['Deadhead',load.deadhead_miles],['Status',statusText(load.status)],['Assigned driver',isDriver?'You':(driverAccountNames.get(load.driver_user_id)||driverNames.get(load.driver_id)||'Unassigned')]];
-      if(!isDriver&&fin)pairs.push(['Carrier pay',money(fin.carrier_pay)],['Carrier RPM',load.miles>0&&fin.carrier_pay!=null?'$'+(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—'],['Market RPM',fin.market_rpm??'—'],['Market RPM source',fin.market_rpm_source??'Not provided']);
+      if(!isDriver&&fin)pairs.push(['Gross carrier pay',money(fin.carrier_pay)],['Source RPM',fin.source_rpm??(load.miles>0&&fin.carrier_pay!=null?'
       pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
       detailPanel.append(info);
-      if(canManage){const statusRow=$('div','load-status-editor');const statusSelect=$('select');[['draft','Draft'],['booked','Booked'],['dispatched','Dispatched'],['at_pickup','At pickup'],['loaded','Loaded'],['in_transit','In transit'],['at_delivery','At delivery'],['delivered','Delivered'],['on_hold','On hold'],['canceled','Canceled']].forEach(([v,t])=>statusSelect.append(new Option(t,v)));statusSelect.value=load.status;const updateStatus=button('Update status','button',async()=>{updateStatus.disabled=true;const {error}=await supabase.from('dispatch_loads').update({status:statusSelect.value}).eq('id',load.id);updateStatus.disabled=false;if(error)say(error.message,true);else{say('Load status updated.');await refresh()}});statusRow.append($('span','','Status'),statusSelect,updateStatus);detailPanel.append(statusRow)}
+      if(canManage){const statusRow=$('div','load-status-editor');const statusSelect=$('select');[['pending','Pending'],['booked','Booked'],['in_transit','In Transit'],['delivered','Delivered'],['canceled','Canceled']].forEach(([v,t])=>statusSelect.append(new Option(t,v)));statusSelect.value=load.status;const updateStatus=button('Update status','button',async()=>{updateStatus.disabled=true;const {error}=await supabase.from('dispatch_loads').update({status:statusSelect.value}).eq('id',load.id);updateStatus.disabled=false;if(error)say(error.message,true);else{say('Load status updated.');await refresh()}});statusRow.append($('span','','Status'),statusSelect,updateStatus);detailPanel.append(statusRow)}
       for(const st of ss){
         const box=$('div','load-detail-stop');box.append($('h4','',st.stop_type.toUpperCase()+' · '+(st.facility_name||'Facility')));
         const address=[st.address_line_1,st.address_line_2,st.city,st.state,st.postal_code].filter(Boolean).join(', ');
         box.append($('p','',address||'Address not entered'));
         if(address){const links=$('div','load-inline-links');const copy=button('Copy address','button',()=>{if(!navigator.clipboard)return say('Clipboard access is unavailable in this browser.',true);navigator.clipboard.writeText(address).then(()=>say('Address copied.')).catch(()=>say('Could not copy address.',true))});const map=$('a','button','Open map');map.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(address);map.target='_blank';map.rel='noopener';links.append(copy,map);box.append(links)}
-        box.append($('p','',st.appointment_type==='fcfs'?'FCFS':fmtDate(st.appointment_start)),$('p','',st.facility_hours||''),$('p','',st.instructions||''));
+        box.append($('p','',stopSchedule(st)),$('p','',st.facility_hours||''),$('p','',st.instructions||''));
+        if(st.contact_phone){const a=$('a','','Call facility');a.href='tel:'+st.contact_phone;box.append(a)}
+        if(st.contact_email){const a=$('a','','Email facility');a.href='mailto:'+st.contact_email;box.append(a)}
+        detailPanel.append(box);
+      }
+      const docs=docById.get(load.id)||[];
+      if(docs.length){const docBox=$('div','load-detail-docs');docBox.append($('h4','','Documents'));for(const doc of docs){const row=$('div','load-document-row');row.append($('span','',doc.file_name+' · '+doc.document_type.replaceAll('_',' ')));const open=button('Open','button',async()=>{const {data,error}=await supabase.storage.from(doc.storage_bucket||'load-documents').createSignedUrl(doc.file_path,300);if(error)say(error.message,true);else window.open(data.signedUrl,'_blank','noopener')});row.append(open);docBox.append(row)}detailPanel.append(docBox)}
+      if(canManage){
+        const upload=$('form','load-document-upload');const type=$('select');[['rate_confirmation','Rate confirmation'],['info_sheet','Info sheet'],['bol','BOL'],['receipt','Receipt'],['other','Other']].forEach(([v,t])=>type.append(new Option(t,v)));
+        const file=$('input');file.type='file';file.accept='.pdf,.jpg,.jpeg,.png';file.required=true;
+        upload.append(type,file);const upBtn=$('button','button','Upload document');upBtn.type='submit';upload.append(upBtn);
+        upload.addEventListener('submit',async e=>{e.preventDefault();if(!file.files[0])return;upBtn.disabled=true;try{const f=file.files[0];if(!['application/pdf','image/jpeg','image/png'].includes(f.type)||f.size>52428800)throw new Error('Use a PDF, JPG, or PNG under 50 MB.');const path=load.id+'/'+crypto.randomUUID()+'-'+f.name.replace(/[^a-zA-Z0-9._-]+/g,'-');const {error:u}=await supabase.storage.from('load-documents').upload(path,f,{contentType:f.type,upsert:false});if(u)throw u;const {error:ins}=await supabase.from('dispatch_load_documents').insert({load_id:load.id,document_type:type.value,file_name:f.name,file_path:path,content_type:f.type,uploaded_by:user.id});if(ins){await supabase.storage.from('load-documents').remove([path]);throw ins}say('Document uploaded.');await refresh()}catch(e){say(e.message,true)}finally{upBtn.disabled=false}});
+        detailPanel.append(upload);
+      }
+      actions.append(detail);card.append(top,route,meta,actions,detailPanel);list.append(card);
+    }
+  }
+  search.addEventListener('input',()=>refresh());filter.addEventListener('change',()=>refresh());
+  window.addEventListener('tt-loads-updated',refresh);
+  await refresh();
+}
+
++(Number(fin.carrier_pay)/Number(load.miles)).toFixed(2):'—')],['Market RPM',fin.market_rpm??'—'],['Market RPM source',fin.market_rpm_source??'Not provided']);
+      if(load.load_notes)pairs.push(['Load notes',load.load_notes]);
+      pairs.forEach(([k,v])=>{const x=$('div');x.append($('small','',k),$('strong','',safe(v)));info.append(x)});
+      detailPanel.append(info);
+      if(canManage){const statusRow=$('div','load-status-editor');const statusSelect=$('select');[['pending','Pending'],['booked','Booked'],['in_transit','In Transit'],['delivered','Delivered'],['canceled','Canceled']].forEach(([v,t])=>statusSelect.append(new Option(t,v)));statusSelect.value=load.status;const updateStatus=button('Update status','button',async()=>{updateStatus.disabled=true;const {error}=await supabase.from('dispatch_loads').update({status:statusSelect.value}).eq('id',load.id);updateStatus.disabled=false;if(error)say(error.message,true);else{say('Load status updated.');await refresh()}});statusRow.append($('span','','Status'),statusSelect,updateStatus);detailPanel.append(statusRow)}
+      for(const st of ss){
+        const box=$('div','load-detail-stop');box.append($('h4','',st.stop_type.toUpperCase()+' · '+(st.facility_name||'Facility')));
+        const address=[st.address_line_1,st.address_line_2,st.city,st.state,st.postal_code].filter(Boolean).join(', ');
+        box.append($('p','',address||'Address not entered'));
+        if(address){const links=$('div','load-inline-links');const copy=button('Copy address','button',()=>{if(!navigator.clipboard)return say('Clipboard access is unavailable in this browser.',true);navigator.clipboard.writeText(address).then(()=>say('Address copied.')).catch(()=>say('Could not copy address.',true))});const map=$('a','button','Open map');map.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(address);map.target='_blank';map.rel='noopener';links.append(copy,map);box.append(links)}
+        box.append($('p','',stopSchedule(st)),$('p','',st.facility_hours||''),$('p','',st.instructions||''));
         if(st.contact_phone){const a=$('a','','Call facility');a.href='tel:'+st.contact_phone;box.append(a)}
         if(st.contact_email){const a=$('a','','Email facility');a.href='mailto:'+st.contact_email;box.append(a)}
         detailPanel.append(box);
