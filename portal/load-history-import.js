@@ -33,7 +33,7 @@ const statusValue = (value, row) => {
   if(['pending','awaiting ratecon','awaiting confirmation','draft'].includes(s))return 'pending';
   if(['booked','book'].includes(s))return 'booked';
   if(s==='accessorial'){
-    if(type==='tonu' && (row.carrier_pay===0 || /cancel|canceled|cancelled/.test(note)))return 'canceled';
+    if(type==='tonu' && /cancel|canceled|cancelled/.test(note))return 'canceled';
     if(/load cancel|load canceled|load cancelled|canceled load|cancelled load/.test(note))return 'canceled';
     return null;
   }
