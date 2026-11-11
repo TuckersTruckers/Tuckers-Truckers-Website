@@ -4,8 +4,11 @@ const normalize = value => String(value ?? '').trim().toLowerCase().replace(/[^a
 const clean = value => value === null || value === undefined || String(value).trim()==='' ? null : String(value).trim();
 const numeric = value => {
   if (value === null || value === undefined || String(value).trim()==='') return null;
-  const n=Number(String(value).replace(/[$,]/g,'').replace(/%/g,''));
-  return Number.isFinite(n) && n>=0 ? n : null;
+  if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null;
+  let s=String(value).trim().replace(/[$,\\s]/g,'').replace(/%$/,'');
+  const negative=/^\\(.*\\)$/.test(s); if(negative)s=s.slice(1,-1);
+  const n=Number(s);
+  return Number.isFinite(n) && n>=0 && !negative ? n : null;
 };
 const dateOnly = (value, XLSXLib) => {
   if(value===null || value===undefined || value==='') return null;
@@ -15,38 +18,43 @@ const dateOnly = (value, XLSXLib) => {
     if(p?.y&&p?.m&&p?.d)return [p.y,String(p.m).padStart(2,'0'),String(p.d).padStart(2,'0')].join('-');
   }
   const s=String(value).trim();
-  const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  const m=s.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{2,4})$/);
   if(m){let y=Number(m[3]);if(y<100)y+=y<50?2000:1900;return [y,String(Number(m[1])).padStart(2,'0'),String(Number(m[2])).padStart(2,'0')].join('-')}
-  const iso=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const iso=s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})/);
   if(iso)return [iso[1],String(Number(iso[2])).padStart(2,'0'),String(Number(iso[3])).padStart(2,'0')].join('-');
   return null;
 };
-const statusValue = value => {
-  const s=normalize(value);
+const statusValue = (value, row) => {
+  const s=normalize(value), note=normalize(row.load_notes), type=normalize(row.accessorial_type);
   if(!s)return 'booked';
   if(['cancelled','canceled'].includes(s))return 'canceled';
   if(['delivered','complete','completed'].includes(s))return 'delivered';
   if(['in transit','transit','loaded','dispatched','at pickup','at delivery'].includes(s))return 'in_transit';
   if(['pending','awaiting ratecon','awaiting confirmation','draft'].includes(s))return 'pending';
   if(['booked','book'].includes(s))return 'booked';
-  if(s==='accessorial')return 'delivered';
+  if(s==='accessorial'){
+    if(type==='tonu' && (row.carrier_pay===0 || /cancel|canceled|cancelled/.test(note)))return 'canceled';
+    if(/load cancel|load canceled|load cancelled|canceled load|cancelled load/.test(note))return 'canceled';
+    return null;
+  }
   return 'pending';
 };
 const makeKey = row => [row.po_number,row.pickup_date,row.pickup_city,row.pickup_state,row.delivery_city,row.delivery_state,row.broker_name]
   .map(v=>normalize(v)).join('|');
 
 function findColumn(headers, names, occurrence=0) {
-  const wanted=names.map(normalize);
-  const matches=[];
+  const wanted=names.map(normalize), matches=[];
   headers.forEach((h,i)=>{if(wanted.includes(normalize(h)))matches.push(i)});
   return matches[occurrence] ?? -1;
 }
-
 function mapRows(matrix) {
-  const headerIndex=Math.max(0,matrix.findIndex(row=>{
+  const headerIndex=matrix.findIndex(row=>{
     const names=(row||[]).map(normalize);
-    return names.includes('po') && names.some(x=>x==='broker'||x==='brokerage') && names.filter(x=>x==='date'||x==='pickup date'||x==='delivery date').length>=1;
-  }));
+    return names.includes('po') && names.some(x=>x==='broker'||x==='brokerage') &&
+      (names.includes('pu st')||names.includes('pickup state')) &&
+      (names.includes('del st')||names.includes('delivery state'));
+  });
+  if(headerIndex<0)throw new Error('Could not find the actual load header row (PO, Broker, PU St, and Del St).');
   const headers=(matrix[headerIndex]||[]).map(x=>String(x??'').trim());
   const col={
     po:findColumn(headers,['po','po #','po number','po no']),
@@ -62,20 +70,23 @@ function mapRows(matrix) {
     deadhead:findColumn(headers,['d h','dh','deadhead','deadhead miles']),
     broker:findColumn(headers,['broker','brokerage']),
     weight:findColumn(headers,['weight','weight lbs']),
-    pay:findColumn(headers,['pay','carrier pay','gross pay','load pay']),
+    pay:findColumn(headers,['pay','carrier pay','gross pay','load pay'],0),
     rpm:findColumn(headers,['rpm','rate per mile']),
     market:findColumn(headers,['market','market rpm']),
     notes:findColumn(headers,['notes','load notes']),
-    status:findColumn(headers,['status','load status'])
+    status:findColumn(headers,['status','load status']),
+    accessorialType:findColumn(headers,['accessorial s','accessorial','accessorial type','additional charge type']),
+    accessorialPay:findColumn(headers,['pay','accessorial pay','additional pay','accessorial amount'],1)
   };
-  const missing=['po','pickupDate','pickupCity','pickupState','deliveryDate','deliveryCity','deliveryState','pay'].filter(k=>col[k]<0);
-  if(missing.length)throw new Error('Could not identify required columns: '+missing.join(', ')+'. Check that the first row contains the column headings.');
+  const required=['po','pickupDate','pickupCity','pickupState','deliveryDate','deliveryCity','deliveryState','pay'];
+  const missing=required.filter(k=>col[k]<0);
+  if(missing.length)throw new Error('Could not identify required source columns: '+missing.join(', ')+'.');
   const rows=[];
   matrix.slice(headerIndex+1).forEach((cells,index)=>{
+    if((cells||[]).every(v=>String(v??'').trim()===''))return;
     const value=k=>col[k]>=0?cells[col[k]]:null;
-    if(cells.every(v=>String(v??'').trim()===''))return;
     const row={
-      source_row:index+2,
+      source_row:headerIndex+index+2,
       po_number:clean(value('po')),
       pickup_date:dateOnly(value('pickupDate'),XLSX),
       pickup_city:clean(value('pickupCity')),
@@ -93,8 +104,11 @@ function mapRows(matrix) {
       source_rpm:numeric(value('rpm')),
       market_rpm:numeric(value('market')),
       load_notes:clean(value('notes')),
-      status:statusValue(value('status'))
+      accessorial_type:clean(value('accessorialType')),
+      accessorial_amount:numeric(value('accessorialPay')),
+      status:null
     };
+    row.status=statusValue(value('status'),row);
     row.source_import_key=makeKey(row);
     row.errors=[];
     if(!row.po_number)row.errors.push('Missing PO number');
@@ -103,12 +117,12 @@ function mapRows(matrix) {
     if(!row.pickup_city||!row.pickup_state)row.errors.push('Missing pickup city/state');
     if(!row.delivery_city||!row.delivery_state)row.errors.push('Missing delivery city/state');
     if(row.carrier_pay===null)row.errors.push('Missing or invalid gross carrier pay');
+    if(!row.status)row.errors.push('Legacy Accessorial status is ambiguous; review status before importing');
     row.base_errors=[...row.errors];
     rows.push(row);
   });
   return rows;
 }
-
 export async function initLoadHistoryImport({supabase,user,carriers,root,onNotice,onImported}) {
   if(!root||!user||!carriers?.length)return;
   const section=document.createElement('section');
@@ -124,7 +138,7 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
   const carrierLabel=document.createElement('label');carrierLabel.className='load-field';const carrierCaption=document.createElement('span');carrierCaption.textContent='Carrier account';const carrier=document.createElement('select');carrier.append(new Option('Select carrier',''));carriers.forEach(c=>carrier.append(new Option((c.business_name||c.company_name||'Carrier')+' · MC '+(c.mc_number||'—'),c.user_id)));carrierLabel.append(carrierCaption,carrier);
   const fileLabel=document.createElement('label');fileLabel.className='load-field';const fileCaption=document.createElement('span');fileCaption.textContent='Excel or CSV file';const file=document.createElement('input');file.type='file';file.accept='.xlsx,.xls,.csv';fileLabel.append(fileCaption,file);
   const controls=document.createElement('div');controls.className='load-history-import-controls';controls.append(carrierLabel,fileLabel);
-  const help=document.createElement('p');help.className='load-form-help';help.textContent='Expected columns include PO, pickup date/city/state/time, delivery date/city/state/time, miles, deadhead, broker, weight, pay, RPM, market, notes, and status. Repeated Date, City, and Time headings are handled in left-to-right order.';
+  const help=document.createElement('p');help.className='load-form-help';help.textContent='The importer reads the actual load columns only. Hidden formula helpers and invoice/pivot columns are ignored. The first Pay column is gross broker-to-carrier pay; the second Pay column is a separate accessorial payment.';
   const preview=document.createElement('div');preview.className='load-history-import-preview';preview.hidden=true;
   const actions=document.createElement('div');actions.className='load-form-actions';
   const importButton=document.createElement('button');importButton.type='button';importButton.className='button primary';importButton.textContent='Import valid loads';importButton.disabled=true;
@@ -153,9 +167,9 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
     preview.append(summary);
     const table=document.createElement('table');table.className='load-history-preview-table';
     const thead=document.createElement('thead'),tr=document.createElement('tr');
-    ['PO','Pickup','Delivery','Broker','Gross pay','Status','Import check'].forEach(label=>{const th=document.createElement('th');th.textContent=label;tr.append(th)});thead.append(tr);table.append(thead);
+    ['Source row','PO','Pickup','Delivery','Broker','Gross pay','Extra payment','Status','Import check'].forEach(label=>{const th=document.createElement('th');th.textContent=label;tr.append(th)});thead.append(tr);table.append(thead);
     const tbody=document.createElement('tbody');
-    rows.slice(0,30).forEach(r=>{const tr=document.createElement('tr');const vals=[r.po_number,[r.pickup_date,r.pickup_city,r.pickup_state,r.pickup_time].filter(Boolean).join(' · '),[r.delivery_date,r.delivery_city,r.delivery_state,r.delivery_time].filter(Boolean).join(' · '),r.broker_name,r.carrier_pay===null?'':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(r.carrier_pay),r.status,r.errors.join('; ')||'Ready'];vals.forEach(v=>{const td=document.createElement('td');td.textContent=String(v??'');tr.append(td)});tbody.append(tr)});
+    rows.slice(0,30).forEach(r=>{const tr=document.createElement('tr');const vals=[r.source_row,r.po_number,[r.pickup_date,r.pickup_city,r.pickup_state,r.pickup_time].filter(Boolean).join(' · '),[r.delivery_date,r.delivery_city,r.delivery_state,r.delivery_time].filter(Boolean).join(' · '),r.broker_name,r.carrier_pay===null?'':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(r.carrier_pay),r.accessorial_amount===null?'':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(r.accessorial_amount),r.status||'Review',r.errors.join('; ')||'Ready'];vals.forEach(v=>{const td=document.createElement('td');td.textContent=String(v??'');tr.append(td)});tbody.append(tr)});
     table.append(tbody);preview.append(table);
     if(rows.length>30){const more=document.createElement('p');more.textContent='Showing first 30 rows in preview; all '+rows.length+' rows are included in the import summary.';preview.append(more)}
     importButton.textContent='Import '+ready.length+' valid loads';importButton.disabled=!ready.length;
@@ -166,9 +180,9 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
     if(!file.files?.[0])return;
     if(!carrier.value){notice('Select the carrier account before choosing a file.',true);file.value='';return}
     try{
-      const workbook=XLSX.read(await file.files[0].arrayBuffer(),{type:'array',cellDates:true});
+      const workbook=XLSX.read(await file.files[0].arrayBuffer(),{type:'array',cellDates:true,cellNF:true,cellText:true});
       const sheet=workbook.Sheets[workbook.SheetNames[0]];
-      const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});
+      const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
       if(!matrix.length)throw new Error('The selected file is empty.');
       await renderPreview(mapRows(matrix));
       preview.hidden=false;
