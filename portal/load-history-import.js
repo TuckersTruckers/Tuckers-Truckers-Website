@@ -75,6 +75,7 @@ function mapRows(matrix) {
     market:findColumn(headers,['market','market rpm']),
     notes:findColumn(headers,['notes','load notes']),
     status:findColumn(headers,['status','load status']),
+    brokerPhone:findColumn(headers,['broker contact','broker phone','contact phone']),
     accessorialType:findColumn(headers,['accessorial s','accessorial','accessorial type','additional charge type']),
     accessorialPay:findColumn(headers,['pay','accessorial pay','additional pay','accessorial amount'],1)
   };
@@ -104,6 +105,7 @@ function mapRows(matrix) {
       source_rpm:numeric(value('rpm')),
       market_rpm:numeric(value('market')),
       load_notes:clean(value('notes')),
+      broker_phone:clean(value('brokerPhone')),
       accessorial_type:clean(value('accessorialType')),
       accessorial_amount:numeric(value('accessorialPay')),
       status:null
@@ -200,7 +202,7 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
       try{
         const {data:load,error}=await supabase.from('dispatch_loads').insert({
           carrier_user_id:carrierId,created_by:user.id,status:row.status,
-          po_number:row.po_number,broker_name:row.broker_name,weight_lbs:row.weight_lbs,
+          po_number:row.po_number,broker_name:row.broker_name,broker_phone:row.broker_phone,weight_lbs:row.weight_lbs,
           miles:row.miles,deadhead_miles:row.deadhead_miles,load_notes:row.load_notes,
           source_import_key:row.source_import_key
         }).select('id').single();
