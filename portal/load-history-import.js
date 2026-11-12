@@ -197,11 +197,23 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
     const rows=parsedRows.filter(r=>!r.errors.length);
     importButton.disabled=true;importButton.textContent='Importing…';
     let imported=0,failed=0;
+    const failures=[];
+    let importUserId=null;
+    try{
+      const {data:authData,error:authError}=await supabase.auth.getUser();
+      if(authError)throw authError;
+      importUserId=authData?.user?.id||null;
+      if(!importUserId)throw new Error('Your authenticated session could not be verified. Sign out and back in, then retry.');
+    }catch(e){
+      notice('Import stopped before writing any loads: '+(e.message||e),true);
+      importButton.disabled=false;importButton.textContent='Import '+rows.length+' valid loads';
+      return;
+    }
     for(const row of rows){
       let loadId=null;
       try{
         const {data:load,error}=await supabase.from('dispatch_loads').insert({
-          carrier_user_id:carrierId,created_by:user.id,status:row.status,
+          carrier_user_id:carrierId,created_by:importUserId,status:row.status,
           po_number:row.po_number,broker_name:row.broker_name,broker_phone:row.broker_phone,weight_lbs:row.weight_lbs,
           miles:row.miles,deadhead_miles:row.deadhead_miles,load_notes:row.load_notes,
           source_import_key:row.source_import_key
@@ -212,24 +224,35 @@ export async function initLoadHistoryImport({supabase,user,carriers,root,onNotic
           {load_id:loadId,stop_order:2,stop_type:'delivery',city:row.delivery_city,state:row.delivery_state,appointment_date:row.delivery_date,appointment_label:row.delivery_time,appointment_type:/fcfs/i.test(row.delivery_time||'')?'fcfs':'appointment'}
         ];
         const {error:stopError}=await supabase.from('dispatch_load_stops').insert(stops);if(stopError)throw stopError;
-        const {error:financialError}=await supabase.from('dispatch_load_financials').insert({load_id:loadId,carrier_pay:row.carrier_pay,source_rpm:row.source_rpm,market_rpm:row.market_rpm,updated_by:user.id});
+        const {error:financialError}=await supabase.from('dispatch_load_financials').insert({load_id:loadId,carrier_pay:row.carrier_pay,source_rpm:row.source_rpm,market_rpm:row.market_rpm,updated_by:importUserId});
         if(financialError)throw financialError;
         if(row.accessorial_amount!==null && row.accessorial_amount>0){
           const rawType=normalize(row.accessorial_type||'other');
           const typeMap={detention:'detention',layover:'layover',tonu:'tonu',lumper:'lumper','stop off':'stop_off','driver assist':'driver_assist'};
           const accessorialType=typeMap[rawType]||'other';
           const description=accessorialType==='other' ? (row.accessorial_type||'Unspecified additional payment') : null;
-          const {error:accessorialError}=await supabase.from('dispatch_load_accessorials').insert({load_id:loadId,accessorial_type:accessorialType,description,amount:row.accessorial_amount,payment_status:'received',created_by:user.id});
+          const {error:accessorialError}=await supabase.from('dispatch_load_accessorials').insert({load_id:loadId,accessorial_type:accessorialType,description,amount:row.accessorial_amount,payment_status:'received',created_by:importUserId});
           if(accessorialError)throw accessorialError;
         }
         imported++;
       }catch(e){
         failed++;
-        if(loadId)await supabase.from('dispatch_loads').delete().eq('id',loadId);
-        notice('A row could not be imported (PO '+(row.po_number||'unknown')+'): '+(e.message||e),true);
+        if(loadId){
+          const {error:cleanupError}=await supabase.from('dispatch_loads').delete().eq('id',loadId);
+          if(cleanupError)failures.push('PO '+(row.po_number||'unknown')+': '+(e.message||e)+'; cleanup also failed: '+cleanupError.message);
+          else failures.push('PO '+(row.po_number||'unknown')+': '+(e.message||e));
+        }else{
+          const detail=[e.message,e.code,e.details,e.hint].filter(Boolean).join(' · ');
+          failures.push('PO '+(row.po_number||'unknown')+': '+(detail||String(e)));
+        }
       }
     }
-    notice('Historical import finished: '+imported+' loads imported, '+failed+' failed. Re-importing this same file will skip already imported rows.');
+    if(failed){
+      const examples=failures.slice(0,3).join(' | ');
+      notice('Historical import finished: '+imported+' loads imported, '+failed+' failed. First error(s): '+examples+(failures.length>3?' (and '+(failures.length-3)+' more)':''),true);
+    }else{
+      notice('Historical import finished: '+imported+' loads imported, 0 failed.');
+    }
     file.value='';preview.hidden=true;preview.replaceChildren();parsedRows=[];
     await onImported?.();
     importButton.disabled=true;importButton.textContent='Import valid loads';
